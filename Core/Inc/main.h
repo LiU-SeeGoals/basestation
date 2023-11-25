@@ -59,10 +59,22 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define LED_YELLOW_Pin GPIO_PIN_4
 #define LED_YELLOW_GPIO_Port GPIOF
+#define NRF_SCK_Pin GPIO_PIN_5
+#define NRF_SCK_GPIO_Port GPIOA
 #define LED_GREEN_Pin GPIO_PIN_0
 #define LED_GREEN_GPIO_Port GPIOB
 #define LED_RED_Pin GPIO_PIN_4
 #define LED_RED_GPIO_Port GPIOG
+#define NRF_CE_Pin GPIO_PIN_6
+#define NRF_CE_GPIO_Port GPIOC
+#define NRF_MISO_Pin GPIO_PIN_9
+#define NRF_MISO_GPIO_Port GPIOG
+#define NRF_MOSI_Pin GPIO_PIN_5
+#define NRF_MOSI_GPIO_Port GPIOB
+#define NRF_CSN_Pin GPIO_PIN_8
+#define NRF_CSN_GPIO_Port GPIOB
+#define NRF_IRQ_Pin GPIO_PIN_9
+#define NRF_IRQ_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 
