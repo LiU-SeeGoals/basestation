@@ -25,6 +25,8 @@
 #include "nxd_dhcp_client.h"
 /* USER CODE BEGIN Includes */
 #include "main.h"
+#include "pb_decode.h"
+#include "simple.pb.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -66,6 +68,7 @@ static VOID ip_address_change_notify_callback(NX_IP *ip_instance, VOID *ptr);
 /* USER CODE BEGIN PFP */
 static VOID nx_link_thread_entry(ULONG thread_input);
 static VOID nx_udp_thread_entry(ULONG thread_input);
+static VOID udp_socket_receive_proto(NX_UDP_SOCKET *socket_ptr);
 static VOID udp_socket_receive_raw(NX_UDP_SOCKET *socket_ptr);
 /* USER CODE END PFP */
 
@@ -211,6 +214,13 @@ UINT MX_NetXDuo_Init(VOID *memory_ptr)
   tx_semaphore_create(&DHCPSemaphore, "DHCP Semaphore", 0);
 
   /* USER CODE BEGIN MX_NetXDuo_Init */
+
+  // Enable IGMP so we can subscribe to multicast groups
+  ret = nx_igmp_enable(&NetXDuoEthIpInstance);
+  if (ret != NX_SUCCESS) {
+    return NX_NOT_SUCCESSFUL;
+  }
+
   // Create the link thread
   if (tx_byte_allocate(byte_pool, (VOID **) &pointer, NX_APP_THREAD_STACK_SIZE, TX_NO_WAIT) != TX_SUCCESS)
   {
@@ -323,107 +333,166 @@ static VOID nx_app_thread_entry (ULONG thread_input)
   /* USER CODE END Nx_App_Thread_Entry 2 */
 
 }
+
 /* USER CODE BEGIN 1 */
-  static VOID nx_link_thread_entry(ULONG thread_input)
-  {
-    ULONG status;
-    UINT ret = NX_SUCCESS;
-    UINT linkdown = -1;
+static VOID nx_link_thread_entry(ULONG thread_input)
+{
+  ULONG status;
+  UINT ret = NX_SUCCESS;
+  UINT linkdown = -1;
 
-    for(;;) {
-      ret = nx_ip_interface_status_check(&NetXDuoEthIpInstance, 0, NX_IP_LINK_ENABLED, &status, 10);
+  for(;;) {
+    ret = nx_ip_interface_status_check(&NetXDuoEthIpInstance, 0, NX_IP_LINK_ENABLED, &status, 10);
 
-      if (ret != NX_SUCCESS) {
-        if (linkdown != 1) {
-          linkdown = 1;
-          printf("Link down...\r\n");
-          HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_SET);
-          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
-        }
+    if (ret != NX_SUCCESS) {
+      if (linkdown != 1) {
+        linkdown = 1;
+        printf("Link down...\r\n");
+        HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_SET);
+        HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
+      }
 
-        // Indicate on LED
-        HAL_GPIO_TogglePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin);
-        HAL_Delay(500);
-        HAL_GPIO_TogglePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin);
-      } else {
-        if (linkdown == 1) {
-          linkdown = 0;
-          printf("Link up...\r\n");
+      // Indicate on LED
+      HAL_GPIO_TogglePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin);
+      HAL_Delay(500);
+      HAL_GPIO_TogglePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin);
+    } else {
+      if (linkdown == 1) {
+        linkdown = 0;
+        printf("Link up...\r\n");
 
-          ret = nx_ip_interface_status_check(&NetXDuoEthIpInstance, 0, NX_IP_ADDRESS_RESOLVED, &status, 10);
+        ret = nx_ip_interface_status_check(&NetXDuoEthIpInstance, 0, NX_IP_ADDRESS_RESOLVED, &status, 10);
 
-          if (ret == NX_SUCCESS) {
-            printf("IP resolved...\r\n");
-            HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
-            HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_RESET);
-          } else {
-            printf("IP not resolved...\r\n");
-            HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
-            HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_SET);
-            nx_ip_driver_direct_command(&NetXDuoEthIpInstance, NX_LINK_ENABLE, &status);
-            nx_dhcp_stop(&DHCPClient);
-            nx_dhcp_start(&DHCPClient);
-          }
-        } else {
-          linkdown = 0;
+        if (ret == NX_SUCCESS) {
+          printf("IP resolved...\r\n");
           HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
           HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_RESET);
+        } else {
+          printf("IP not resolved...\r\n");
+          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
+          HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_SET);
+          nx_ip_driver_direct_command(&NetXDuoEthIpInstance, NX_LINK_ENABLE, &status);
+          nx_dhcp_stop(&DHCPClient);
+          nx_dhcp_start(&DHCPClient);
         }
+      } else {
+        linkdown = 0;
+        HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
+        HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_RESET);
       }
-
-      tx_thread_sleep(NX_LINK_CHECK_PERIOD);
     }
+
+    tx_thread_sleep(NX_LINK_CHECK_PERIOD);
+  }
+}
+
+static VOID nx_udp_thread_entry (ULONG thread_input)
+{
+  UINT ret = NX_SUCCESS;
+
+  ret = nx_udp_socket_create(&NetXDuoEthIpInstance,
+                             &visionSocket,
+                             "UDP Client Socket",
+                             NX_IP_NORMAL,
+                             NX_FRAGMENT_OKAY,
+                             NX_IP_TIME_TO_LIVE,
+                             QUEUE_MAX_SIZE);
+  if (ret != NX_SUCCESS) {
+    Error_Handler();
   }
 
-  static VOID nx_udp_thread_entry (ULONG thread_input)
-  {
-    UINT ret = NX_SUCCESS;
-
-    ret = nx_udp_socket_create(&NetXDuoEthIpInstance,
-                               &rawSocket,
-                               "UDP Client Socket",
-                               NX_IP_NORMAL,
-                               NX_FRAGMENT_OKAY,
-                               NX_IP_TIME_TO_LIVE,
-                               QUEUE_MAX_SIZE);
-    if (ret != NX_SUCCESS) {
-      Error_Handler();
-    }
-
-    ret = nx_udp_socket_bind(&rawSocket, RAW_PORT, TX_WAIT_FOREVER);
-    if (ret != NX_SUCCESS) {
-      Error_Handler();
-    }
-
-    ret = nx_udp_socket_receive_notify(&rawSocket, udp_socket_receive_raw);
-    if (ret != NX_SUCCESS) {
-      Error_Handler();
-    }
-
-    tx_thread_relinquish();
+  ret = nx_udp_socket_bind(&visionSocket, VISION_PORT, TX_WAIT_FOREVER);
+  if (ret != NX_SUCCESS) {
+    Error_Handler();
   }
 
-  static VOID udp_socket_receive_raw(NX_UDP_SOCKET *socket_ptr)
-  {
-    UINT ret = NX_SUCCESS;
-    NX_PACKET* data_packet;
-    ret = nx_udp_socket_receive(socket_ptr, &data_packet, NX_APP_DEFAULT_TIMEOUT);
-    if (ret == NX_SUCCESS) {
-      // extract
-      int length = data_packet->nx_packet_append_ptr - data_packet->nx_packet_prepend_ptr;
-      if (length > 255) {
-        length = 255;
-      }
-      char outBuf[256];
-      memcpy(outBuf, data_packet->nx_packet_prepend_ptr, length);
-      outBuf[length] = '\0';
-      nx_packet_release(data_packet);
-      printf("Got data: %s\n", outBuf);
-
-      // notify
-      HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);
-      HAL_Delay(50);
-      HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);
-    }
+  ret = nx_udp_socket_receive_notify(&visionSocket, udp_socket_receive_proto);
+  if (ret != NX_SUCCESS) {
+    Error_Handler();
   }
+
+  printf("Waiting for Proto packets on port %lu...\r\n", VISION_PORT);
+
+  ret = nx_udp_socket_create(&NetXDuoEthIpInstance,
+                             &rawSocket,
+                             "UDP Client Socket",
+                             NX_IP_NORMAL,
+                             NX_FRAGMENT_OKAY,
+                             NX_IP_TIME_TO_LIVE,
+                             QUEUE_MAX_SIZE);
+  if (ret != NX_SUCCESS) {
+    Error_Handler();
+  }
+
+  ret = nx_udp_socket_bind(&rawSocket, RAW_PORT, TX_WAIT_FOREVER);
+  if (ret != NX_SUCCESS) {
+    Error_Handler();
+  }
+
+  ret = nx_udp_socket_receive_notify(&rawSocket, udp_socket_receive_raw);
+  if (ret != NX_SUCCESS) {
+    Error_Handler();
+  }
+
+  printf("Waiting for raw data on port %lu...\r\n", RAW_PORT);
+
+  ret = nx_igmp_multicast_join(&NetXDuoEthIpInstance, IP_ADDRESS(224,0,0,200));
+
+  if (ret != NX_SUCCESS) {
+    printf("Failed joining multicast group: %u\r\n", ret);
+  } else {
+    printf("Joined multicast group\r\n");
+  }
+
+  tx_thread_relinquish();
+}
+
+static VOID udp_socket_receive_proto(NX_UDP_SOCKET *socket_ptr)
+{
+  UINT ret = NX_SUCCESS;
+  NX_PACKET* data_packet;
+  ret = nx_udp_socket_receive(socket_ptr, &data_packet, NX_APP_DEFAULT_TIMEOUT);
+  if (ret == NX_SUCCESS) {
+    // extract
+    int length = data_packet->nx_packet_append_ptr - data_packet->nx_packet_prepend_ptr;
+    pb_istream_t input = pb_istream_from_buffer(data_packet->nx_packet_prepend_ptr, length);
+    SimpleMessage msg;
+    bool res = pb_decode(&input, SimpleMessage_fields, &msg);
+    if (res) {
+      printf("Got protobuf msg: %ld\n", msg.lucky_number);
+    } else {
+      printf("Failed to parse protobuf message\n");
+    }
+    nx_packet_release(data_packet);
+
+    // notify
+    HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);
+    HAL_Delay(50);
+    HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);
+  }
+}
+
+static VOID udp_socket_receive_raw(NX_UDP_SOCKET *socket_ptr)
+{
+  UINT ret = NX_SUCCESS;
+  NX_PACKET* data_packet;
+  ret = nx_udp_socket_receive(socket_ptr, &data_packet, NX_APP_DEFAULT_TIMEOUT);
+  if (ret == NX_SUCCESS) {
+    // extract
+    int length = data_packet->nx_packet_append_ptr - data_packet->nx_packet_prepend_ptr;
+    if (length > 255) {
+      length = 255;
+    }
+    char outBuf[256];
+    memcpy(outBuf, data_packet->nx_packet_prepend_ptr, length);
+    outBuf[length] = '\0';
+    nx_packet_release(data_packet);
+    printf("Got data: %s\n", outBuf);
+
+    // notify
+    HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);
+    HAL_Delay(50);
+    HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);
+  }
+}
 /* USER CODE END 1 */
