@@ -1,34 +1,35 @@
 # Basestation
+At the time of writing no Makefile project could be produced for the H5 CPU. So this project has to be imported into STM32CubeIDE.
 
 ## Sheets
 [NUCLEO-H563ZI](https://www.st.com/resource/en/user_manual/um3115-stm32h5-nucleo144-board-mb1404-stmicroelectronics.pdf)
 
 ## Pins
-| Zio pin (CN7) | MCU pin | STM32 function | NRF pin | Label       |
-|---------------|---------|----------------|---------|-------------|
-| 1             | PC6     | GPIO_Output    | CE      | NRF_CE      |
-| 2             | PB8     | GPIO_Output    | CSN     | NRF_CSN     |
-| 4             | PB9     | GPIO_EXTI9     | IRQ     | NRF_IRQ     |
-| 6             | VDD     | VDD            | VDD     | -           |
-| 8             | GND     | GND            | GND     | -           |
-| 10            | PA5     | SPI1_SCK       | SCK     | NRF_SCK     |
-| 12            | PA6     | SPI1_MISO      | M1      | NRF_MISO    |
-| 14            | PB5     | SPI1_MOSI      | M0      | NRF_MOSI    |
-| -             | PC13    | GPIO_EXTI13    | -       | BTN_USER    |
-| -             | PD8     | USART3_RX      | -       | USART3_RX   |
-| -             | PD9     | USART3_TX      | -       | USART3_TX   |
-| -             | PB0     | GPIO_Output    | -       | LED_GREEN   |
-| -             | PF4     | GPIO_Output    | -       | LED_YELLOW  |
-| -             | PG4     | GPIO_Output    | -       | LED_RED     |
-| -             | PC1     | ETH_MDC        | -       | ETH_MDC     |
-| -             | PA1     | ETH_REF_CLK    | -       | ETH_REF_CLK |
-| -             | PA2     | ETH_MDIO       | -       | ETH_MDIO    |
-| -             | PA7     | ETH_CRS_DV     | -       | ETH_CRS_DV  |
-| -             | PC4     | ETH_RXD0       | -       | ETH_RXD0    |
-| -             | PC5     | ETH_RXD1       | -       | ETH_RXD1    |
-| -             | PB15    | ETH_TXD1       | -       | ETH_TXD1    |
-| -             | PG11    | ETH_TX_EN      | -       | ETH_TX_EN   |
-| -             | PG13    | ETH_TXD0       | -       | ETH_TXD0    |
+| Zio pin (CN7) | MCU pin | STM32 function | NRF pin | Label       | Cable colour |
+|---------------|---------|----------------|---------|-------------|--------------|
+| 1             | PC6     | GPIO_Output    | CE      | NRF_CE      | Yellow       |
+| 2             | PB8     | GPIO_Output    | CSN     | NRF_CSN     | Orange       |
+| 6             | VDD     | VDD            | VDD     | -           | Red          |
+| 8             | GND     | GND            | GND     | -           | Black        |
+| 10            | PA5     | SPI1_SCK       | SCK     | NRF_SCK     | Green        |
+| 12            | PG9     | SPI1_MISO      | M1      | NRF_MISO    | Purple       |
+| 14            | PB5     | SPI1_MOSI      | M0      | NRF_MOSI    | Blue         |
+| 20            | PF3     | GPIO_EXTI3     | IRQ     | NRF_IRQ     | Gray         |
+| -             | PC13    | GPIO_EXTI13    | -       | BTN_USER    | -            |
+| -             | PD8     | USART3_RX      | -       | USART3_RX   | -            |
+| -             | PD9     | USART3_TX      | -       | USART3_TX   | -            |
+| -             | PB0     | GPIO_Output    | -       | LED_GREEN   | -            |
+| -             | PF4     | GPIO_Output    | -       | LED_YELLOW  | -            |
+| -             | PG4     | GPIO_Output    | -       | LED_RED     | -            |
+| -             | PC1     | ETH_MDC        | -       | ETH_MDC     | -            |
+| -             | PA1     | ETH_REF_CLK    | -       | ETH_REF_CLK | -            |
+| -             | PA2     | ETH_MDIO       | -       | ETH_MDIO    | -            |
+| -             | PA7     | ETH_CRS_DV     | -       | ETH_CRS_DV  | -            |
+| -             | PC4     | ETH_RXD0       | -       | ETH_RXD0    | -            |
+| -             | PC5     | ETH_RXD1       | -       | ETH_RXD1    | -            |
+| -             | PB15    | ETH_TXD1       | -       | ETH_TXD1    | -            |
+| -             | PG11    | ETH_TX_EN      | -       | ETH_TX_EN   | -            |
+| -             | PG13    | ETH_TXD0       | -       | ETH_TXD0    | -            |
 
 ## MX configuration
 

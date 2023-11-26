@@ -33,7 +33,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define PUTCHAR_PROTOTYPE int __io_putchar(int ch)
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -66,17 +66,11 @@ static void MX_USART3_UART_Init(void);
 static void MX_ICACHE_Init(void);
 static void MX_SPI1_Init(void);
 /* USER CODE BEGIN PFP */
-
+void NRF_Setup(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-#ifdef __GNUC__
-#define PUTCHAR_PROTOTYPE int __io_putchar(int ch)
-#else
-#define PUTCHAR_PROTOTYPE int fputc(int ch, FILE *f)
-#endif
-
 PUTCHAR_PROTOTYPE
 {
   HAL_UART_Transmit(&huart3, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
@@ -118,11 +112,8 @@ int main(void)
   MX_ICACHE_Init();
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
-  NRF_Init(&hspi1, NRF_CSN_GPIO_Port, NRF_CSN_Pin, NRF_CE_GPIO_Port, NRF_CE_Pin);
-  if(NRF_VerifySPI() != NRF_OK) {
-    printf("Couldn't verify nRF24...\r\n");
-    Error_Handler();
-  }
+  printf("\r\n\r\n");
+  NRF_Setup();
   printf("Initialised...\r\n");
   /* USER CODE END 2 */
 
@@ -399,8 +390,8 @@ static void MX_GPIO_Init(void)
 /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
@@ -420,6 +411,18 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(NRF_CSN_GPIO_Port, NRF_CSN_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : BTN_USER_Pin */
+  GPIO_InitStruct.Pin = BTN_USER_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(BTN_USER_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : NRF_IRQ_Pin */
+  GPIO_InitStruct.Pin = NRF_IRQ_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(NRF_IRQ_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : LED_YELLOW_Pin */
   GPIO_InitStruct.Pin = LED_YELLOW_Pin;
@@ -449,18 +452,108 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(NRF_CE_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : NRF_IRQ_Pin */
-  GPIO_InitStruct.Pin = NRF_IRQ_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(NRF_IRQ_GPIO_Port, &GPIO_InitStruct);
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI3_IRQn, 7, 0);
+  HAL_NVIC_EnableIRQ(EXTI3_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI13_IRQn, 7, 0);
+  HAL_NVIC_EnableIRQ(EXTI13_IRQn);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
+// We've configured the user button to interrupt on rising edge.
+void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin) {
+  switch (GPIO_Pin) {
+    case BTN_USER_Pin:
+      // Print info.
+      NRF_PrintStatus();
+      NRF_PrintFIFOStatus();
 
+      // Send special message.
+      uint8_t special[19] = "user button pressed";
+      NRF_Transmit(special, 19);
+      break;
+    default:
+      printf("Unhandled rising interrupt...\r\n");
+      break;
+  }
+}
+
+// We've configured the NRF_IRQ to trigger interrupt
+// callback on falling edge.
+void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin) {
+  switch (GPIO_Pin) {
+    case NRF_IRQ_Pin:
+      {
+        uint8_t status = NRF_ReadStatus();
+        if (status & (1<<4)) {
+          // Reset MAX_RT in status register.
+          NRF_SetRegisterBit(NRF_REG_STATUS, 4);
+          printf("Message not received, max retries...\r\n");
+        }
+
+        if (status & (1<<5)) {
+          // TX_DS is set in status register.
+          // This means we've gotten an ACK from the receiver
+          // and the message was thus succesfully received.
+          NRF_SetRegisterBit(NRF_REG_STATUS, 5); // Reset TX_DS
+          printf("Successful sent...\r\n");
+        }
+
+        if (status & (1<<6)) {
+          // RX_DR
+          uint8_t length = 0x00;
+          NRF_SendReadCommand(NRF_CMD_R_RX_PL_WID, &length, 1);
+          uint8_t payload[length];
+          NRF_ReadPayload(payload, length);
+          printf("Received data: ");
+          for (int i = 0; i < length; i++) {
+            printf("%c", payload[i]);
+          }
+          printf("\r\n");
+          NRF_SetRegisterBit(NRF_REG_STATUS, 6); // Reset RX_DR
+        }
+      }
+      break;
+    default:
+      printf("Unhandled falling interrupt...\r\n");
+      break;
+  }
+}
+
+void NRF_Setup(void) {
+  uint8_t address[5] = {1,2,3,4,5};
+
+  NRF_Init(&hspi1, NRF_CSN_GPIO_Port, NRF_CSN_Pin, NRF_CE_GPIO_Port, NRF_CE_Pin);
+  if(NRF_VerifySPI() != NRF_OK) {
+    printf("[NRF] Couldn't verify nRF24...\r\n");
+  }
+
+  // Resets all registers but keeps the device in standby-I mode
+  NRF_Reset();
+
+  // Set the RF channel frequency, it's defined as: 2400 + NRF_REG_RF_CH [MHz]
+  NRF_WriteRegisterByte(NRF_REG_RF_CH, 0x0F);
+
+  // Setup the TX address.
+  // We also have to set pipe 0 to receive on the same address.
+  NRF_WriteRegister(NRF_REG_TX_ADDR, address, 5);
+  NRF_WriteRegister(NRF_REG_RX_ADDR_P0, address, 5);
+
+  /* To enable ACK payloads we need to setup dynamic payload length. */
+
+  // Enables us to send custom payload with ACKs.
+  NRF_SetRegisterBit(NRF_REG_FEATURE, 1);
+
+  // Enables dynamic payload length generally.
+  NRF_SetRegisterBit(NRF_REG_FEATURE, 2);
+
+  // Enables dynamic payload on pipe 0.
+  NRF_SetRegisterBit(NRF_REG_DYNPD, 0);
+}
 /* USER CODE END 4 */
 
 /**

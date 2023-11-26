@@ -333,7 +333,6 @@ static VOID nx_app_thread_entry (ULONG thread_input)
   /* USER CODE END Nx_App_Thread_Entry 2 */
 
 }
-
 /* USER CODE BEGIN 1 */
 static VOID nx_link_thread_entry(ULONG thread_input)
 {

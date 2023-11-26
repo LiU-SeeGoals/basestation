@@ -1,11 +1,11 @@
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
-  * @file           : main.h
-  * @brief          : Header for main.c file.
-  *                   This file contains the common defines of the application.
+  * @file    app_netxduo.h
+  * @author  MCD Application Team
+  * @brief   NetXDuo applicative header file
   ******************************************************************************
-  * @attention
+    * @attention
   *
   * Copyright (c) 2023 STMicroelectronics.
   * All rights reserved.
@@ -17,19 +17,20 @@
   ******************************************************************************
   */
 /* USER CODE END Header */
-
 /* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef __MAIN_H
-#define __MAIN_H
+#ifndef __APP_NETXDUO_H__
+#define __APP_NETXDUO_H__
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /* Includes ------------------------------------------------------------------*/
-#include "stm32h5xx_hal.h"
+#include "nx_api.h"
 
 /* Private includes ----------------------------------------------------------*/
+#include "nx_stm32_eth_driver.h"
+
 /* USER CODE BEGIN Includes */
 
 /* USER CODE END Includes */
@@ -43,6 +44,14 @@ extern "C" {
 /* USER CODE BEGIN EC */
 
 /* USER CODE END EC */
+/* The DEFAULT_PAYLOAD_SIZE should match with RxBuffLen configured via MX_ETH_Init */
+#ifndef DEFAULT_PAYLOAD_SIZE
+#define DEFAULT_PAYLOAD_SIZE      1536
+#endif
+
+#ifndef DEFAULT_ARP_CACHE_SIZE
+#define DEFAULT_ARP_CACHE_SIZE    1024
+#endif
 
 /* Exported macro ------------------------------------------------------------*/
 /* USER CODE BEGIN EM */
@@ -50,42 +59,40 @@ extern "C" {
 /* USER CODE END EM */
 
 /* Exported functions prototypes ---------------------------------------------*/
-void Error_Handler(void);
+UINT MX_NetXDuo_Init(VOID *memory_ptr);
 
 /* USER CODE BEGIN EFP */
 
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define BTN_USER_Pin GPIO_PIN_13
-#define BTN_USER_GPIO_Port GPIOC
-#define BTN_USER_EXTI_IRQn EXTI13_IRQn
-#define NRF_IRQ_Pin GPIO_PIN_3
-#define NRF_IRQ_GPIO_Port GPIOF
-#define NRF_IRQ_EXTI_IRQn EXTI3_IRQn
-#define LED_YELLOW_Pin GPIO_PIN_4
-#define LED_YELLOW_GPIO_Port GPIOF
-#define NRF_SCK_Pin GPIO_PIN_5
-#define NRF_SCK_GPIO_Port GPIOA
-#define LED_GREEN_Pin GPIO_PIN_0
-#define LED_GREEN_GPIO_Port GPIOB
-#define LED_RED_Pin GPIO_PIN_4
-#define LED_RED_GPIO_Port GPIOG
-#define NRF_CE_Pin GPIO_PIN_6
-#define NRF_CE_GPIO_Port GPIOC
-#define NRF_MISO_Pin GPIO_PIN_9
-#define NRF_MISO_GPIO_Port GPIOG
-#define NRF_MOSI_Pin GPIO_PIN_5
-#define NRF_MOSI_GPIO_Port GPIOB
-#define NRF_CSN_Pin GPIO_PIN_8
-#define NRF_CSN_GPIO_Port GPIOB
+/* USER CODE BEGIN PD */
+#define NX_LINK_CHECK_PERIOD                 6 * NX_IP_PERIODIC_RATE
+/* USER CODE END PD */
 
-/* USER CODE BEGIN Private defines */
+#define NX_APP_DEFAULT_TIMEOUT               (10 * NX_IP_PERIODIC_RATE)
 
-/* USER CODE END Private defines */
+#define NX_APP_PACKET_POOL_SIZE              ((DEFAULT_PAYLOAD_SIZE + sizeof(NX_PACKET)) * 5)
+
+#define NX_APP_THREAD_STACK_SIZE             2 * 1024
+
+#define Nx_IP_INSTANCE_THREAD_SIZE           2 * 1024
+
+#define NX_APP_THREAD_PRIORITY               10
+
+#ifndef NX_APP_INSTANCE_PRIORITY
+#define NX_APP_INSTANCE_PRIORITY             NX_APP_THREAD_PRIORITY
+#endif
+
+#define NX_APP_DEFAULT_IP_ADDRESS                   0
+
+#define NX_APP_DEFAULT_NET_MASK                     0
+
+/* USER CODE BEGIN 1 */
+
+/* USER CODE END 1 */
 
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __MAIN_H */
+#endif /* __APP_NETXDUO_H__ */
