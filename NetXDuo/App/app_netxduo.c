@@ -68,8 +68,8 @@ static VOID ip_address_change_notify_callback(NX_IP *ip_instance, VOID *ptr);
 /* USER CODE BEGIN PFP */
 static VOID nx_link_thread_entry(ULONG thread_input);
 static VOID nx_udp_thread_entry(ULONG thread_input);
-static VOID udp_socket_receive_proto(NX_UDP_SOCKET *socket_ptr);
-static VOID udp_socket_receive_raw(NX_UDP_SOCKET *socket_ptr);
+static VOID udp_socket_receive_vision(NX_UDP_SOCKET *socket_ptr);
+static VOID udp_socket_receive_controller(NX_UDP_SOCKET *socket_ptr);
 /* USER CODE END PFP */
 
 /**
@@ -405,7 +405,7 @@ static VOID nx_udp_thread_entry (ULONG thread_input)
     Error_Handler();
   }
 
-  ret = nx_udp_socket_receive_notify(&visionSocket, udp_socket_receive_proto);
+  ret = nx_udp_socket_receive_notify(&visionSocket, udp_socket_receive_vision);
   if (ret != NX_SUCCESS) {
     Error_Handler();
   }
@@ -428,7 +428,7 @@ static VOID nx_udp_thread_entry (ULONG thread_input)
     Error_Handler();
   }
 
-  ret = nx_udp_socket_receive_notify(&rawSocket, udp_socket_receive_raw);
+  ret = nx_udp_socket_receive_notify(&rawSocket, udp_socket_receive_controller);
   if (ret != NX_SUCCESS) {
     Error_Handler();
   }
@@ -446,7 +446,7 @@ static VOID nx_udp_thread_entry (ULONG thread_input)
   tx_thread_relinquish();
 }
 
-static VOID udp_socket_receive_proto(NX_UDP_SOCKET *socket_ptr)
+static VOID udp_socket_receive_vision(NX_UDP_SOCKET *socket_ptr)
 {
   UINT ret = NX_SUCCESS;
   NX_PACKET* data_packet;
@@ -471,7 +471,7 @@ static VOID udp_socket_receive_proto(NX_UDP_SOCKET *socket_ptr)
   }
 }
 
-static VOID udp_socket_receive_raw(NX_UDP_SOCKET *socket_ptr)
+static VOID udp_socket_receive_controller(NX_UDP_SOCKET *socket_ptr)
 {
   UINT ret = NX_SUCCESS;
   NX_PACKET* data_packet;
