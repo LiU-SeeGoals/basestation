@@ -26,7 +26,7 @@
 /* USER CODE BEGIN Includes */
 #include "main.h"
 #include "pb_decode.h"
-#include "simple.pb.h"
+#include "ssl_detection.pb.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -57,7 +57,7 @@ TX_THREAD      NxUDPThread;
 TX_THREAD      NxLinkThread;
 NX_UDP_SOCKET  visionSocket;
 NX_UDP_SOCKET  rawSocket;
-ULONG          VISION_PORT = 6000;
+ULONG          VISION_PORT = 10020;
 ULONG          RAW_PORT = 6001;
 ULONG          QUEUE_MAX_SIZE = 512;
 /* USER CODE END PV */
@@ -435,12 +435,12 @@ static VOID nx_udp_thread_entry (ULONG thread_input)
 
   printf("Waiting for raw data on port %lu...\r\n", RAW_PORT);
 
-  ret = nx_igmp_multicast_join(&NetXDuoEthIpInstance, IP_ADDRESS(224,0,0,200));
+  ret = nx_igmp_multicast_join(&NetXDuoEthIpInstance, IP_ADDRESS(224,5,23,2));
 
   if (ret != NX_SUCCESS) {
     printf("Failed joining multicast group: %u\r\n", ret);
   } else {
-    printf("Joined multicast group\r\n");
+    printf("Joined multicast group 224.5.23.2\r\n");
   }
 
   tx_thread_relinquish();
@@ -455,10 +455,10 @@ static VOID udp_socket_receive_vision(NX_UDP_SOCKET *socket_ptr)
     // extract
     int length = data_packet->nx_packet_append_ptr - data_packet->nx_packet_prepend_ptr;
     pb_istream_t input = pb_istream_from_buffer(data_packet->nx_packet_prepend_ptr, length);
-    SimpleMessage msg;
-    bool res = pb_decode(&input, SimpleMessage_fields, &msg);
+    SSL_DetectionFrame msg;
+    bool res = pb_decode(&input, SSL_DetectionFrame_fields, &msg);
     if (res) {
-      printf("Got protobuf msg: %ld\n", msg.lucky_number);
+      printf("Got protobuf msg: %ld\n", msg.camera_id);
     } else {
       printf("Failed to parse protobuf message\n");
     }
