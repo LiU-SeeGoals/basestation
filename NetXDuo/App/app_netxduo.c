@@ -25,8 +25,8 @@
 #include "nxd_dhcp_client.h"
 /* USER CODE BEGIN Includes */
 #include "main.h"
-#include "pb_decode.h"
-#include "ssl_detection.pb.h"
+#include <protobuf-c/protobuf-c.h>
+#include <protobuf-c/ssl_wrapper.pb-c.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -334,6 +334,31 @@ static VOID nx_app_thread_entry (ULONG thread_input)
 
 }
 /* USER CODE BEGIN 1 */
+size_t taken = 0;
+ProtobufCAllocator allocator;
+
+static void* memAlloc(void* allocatorData, size_t size) {
+	static char buffer[1024];
+	if (taken + size > 1024) {
+		printf("Out of memory\n");
+		return NULL;
+	}
+	size_t padding = 0;
+	if (taken % 4 != 0) {
+		padding = 4 - taken % 4;
+	}
+	void* ptr = buffer + taken + padding;
+	taken += size + padding;
+	return ptr;
+}
+
+static void memFree(void* allocatorData, void* ptr) {
+	(void) allocatorData;
+	(void) ptr;
+}
+
+
+
 static VOID nx_link_thread_entry(ULONG thread_input)
 {
   ULONG status;
@@ -443,6 +468,9 @@ static VOID nx_udp_thread_entry (ULONG thread_input)
     printf("Joined multicast group 224.5.23.2\r\n");
   }
 
+  allocator.alloc = &memAlloc;
+  allocator.free = &memFree;
+
   tx_thread_relinquish();
 }
 
@@ -454,14 +482,22 @@ static VOID udp_socket_receive_vision(NX_UDP_SOCKET *socket_ptr)
   if (ret == NX_SUCCESS) {
     // extract
     int length = data_packet->nx_packet_append_ptr - data_packet->nx_packet_prepend_ptr;
-    pb_istream_t input = pb_istream_from_buffer(data_packet->nx_packet_prepend_ptr, length);
+    SSLWrapperPacket* packet = NULL;
+    packet = ssl__wrapper_packet__unpack(&allocator, length, data_packet->nx_packet_prepend_ptr);
+    if (packet == NULL) {
+    	printf("Failed to parse protobuf message\n");
+    } else {
+    	printf("Got protobuf msg\n");
+    }
+    taken = 0;
+    /*pb_istream_t input = pb_istream_from_buffer(data_packet->nx_packet_prepend_ptr, length);
     SSL_DetectionFrame msg;
     bool res = pb_decode(&input, SSL_DetectionFrame_fields, &msg);
     if (res) {
       printf("Got protobuf msg: %ld\n", msg.camera_id);
     } else {
       printf("Failed to parse protobuf message\n");
-    }
+    }*/
     nx_packet_release(data_packet);
 
     // notify

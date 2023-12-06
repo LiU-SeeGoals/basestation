@@ -76,7 +76,7 @@ UINT MX_NetXDuo_Init(VOID *memory_ptr);
 
 #define NX_APP_THREAD_STACK_SIZE             2 * 1024
 
-#define Nx_IP_INSTANCE_THREAD_SIZE           2 * 1024
+#define Nx_IP_INSTANCE_THREAD_SIZE           4 * 1024
 
 #define NX_APP_THREAD_PRIORITY               10
 
