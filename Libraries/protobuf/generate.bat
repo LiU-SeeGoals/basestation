@@ -16,3 +16,4 @@ for %%A in (*.proto) do (
 )
 
 popd
+
