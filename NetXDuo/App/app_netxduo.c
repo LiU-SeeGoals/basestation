@@ -25,8 +25,9 @@
 #include "nxd_dhcp_client.h"
 /* USER CODE BEGIN Includes */
 #include "main.h"
+#include "ssl_detection_tracked.pb-c.h"
 #include <ssl_wrapper.pb-c.h>
-//#include <robot_action.pb-c.h>
+#include <robot_action.pb-c.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -51,15 +52,17 @@ NX_IP          NetXDuoEthIpInstance;
 TX_SEMAPHORE   DHCPSemaphore;
 NX_DHCP        DHCPClient;
 /* USER CODE BEGIN PV */
-ULONG          IPAddress;
-ULONG          Netmask;
-TX_THREAD      NxUDPThread;
-TX_THREAD      NxLinkThread;
-NX_UDP_SOCKET  visionSocket;
-NX_UDP_SOCKET  rawSocket;
-ULONG          VISION_PORT = 10020;
-ULONG          RAW_PORT = 6001;
-ULONG          QUEUE_MAX_SIZE = 512;
+ULONG               IPAddress;
+ULONG               Netmask;
+TX_THREAD           NxUDPThread;
+TX_THREAD           NxLinkThread;
+NX_UDP_SOCKET       visionSocket;
+NX_UDP_SOCKET       rawSocket;
+ULONG               VISION_PORT = 10020;
+ULONG               RAW_PORT = 6001;
+ULONG               QUEUE_MAX_SIZE = 512;
+size_t              taken = 0;
+ProtobufCAllocator  allocator;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -334,20 +337,21 @@ static VOID nx_app_thread_entry (ULONG thread_input)
 
 }
 /* USER CODE BEGIN 1 */
-size_t taken = 0;
-ProtobufCAllocator allocator;
-
 static void* memAlloc(void* allocatorData, size_t size) {
 	static char buffer[1024];
+	size_t padding = 0;
+  void* ptr;
+
 	if (taken + size > 1024) {
 		printf("Out of memory\n");
 		return NULL;
 	}
-	size_t padding = 0;
+
 	if (taken % 4 != 0) {
 		padding = 4 - taken % 4;
 	}
-	void* ptr = buffer + taken + padding;
+
+	ptr = buffer + taken + padding;
 	taken += size + padding;
 	return ptr;
 }
@@ -356,8 +360,6 @@ static void memFree(void* allocatorData, void* ptr) {
 	(void) allocatorData;
 	(void) ptr;
 }
-
-
 
 static VOID nx_link_thread_entry(ULONG thread_input)
 {
@@ -457,11 +459,9 @@ static VOID nx_udp_thread_entry (ULONG thread_input)
   if (ret != NX_SUCCESS) {
     Error_Handler();
   }
-
-  printf("Waiting for raw data on port %lu...\r\n", RAW_PORT);
+  printf("Waiting for robot actions on port %lu...\r\n", RAW_PORT);
 
   ret = nx_igmp_multicast_join(&NetXDuoEthIpInstance, IP_ADDRESS(224,5,23,2));
-
   if (ret != NX_SUCCESS) {
     printf("Failed joining multicast group: %u\r\n", ret);
   } else {
@@ -478,9 +478,9 @@ static VOID udp_socket_receive_vision(NX_UDP_SOCKET *socket_ptr)
 {
   UINT ret = NX_SUCCESS;
   NX_PACKET* data_packet;
+
   ret = nx_udp_socket_receive(socket_ptr, &data_packet, NX_APP_DEFAULT_TIMEOUT);
   if (ret == NX_SUCCESS) {
-    // extract
     int length = data_packet->nx_packet_append_ptr - data_packet->nx_packet_prepend_ptr;
     SSLWrapperPacket* packet = NULL;
     packet = ssl__wrapper_packet__unpack(&allocator, length, data_packet->nx_packet_prepend_ptr);
@@ -499,11 +499,6 @@ static VOID udp_socket_receive_vision(NX_UDP_SOCKET *socket_ptr)
       printf("Failed to parse protobuf message\n");
     }*/
     nx_packet_release(data_packet);
-
-    // notify
-    HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);
-    HAL_Delay(50);
-    HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);
   }
 }
 
@@ -511,23 +506,21 @@ static VOID udp_socket_receive_controller(NX_UDP_SOCKET *socket_ptr)
 {
   UINT ret = NX_SUCCESS;
   NX_PACKET* data_packet;
+
   ret = nx_udp_socket_receive(socket_ptr, &data_packet, NX_APP_DEFAULT_TIMEOUT);
   if (ret == NX_SUCCESS) {
-    // extract
     int length = data_packet->nx_packet_append_ptr - data_packet->nx_packet_prepend_ptr;
-    if (length > 255) {
-      length = 255;
-    }
-    char outBuf[256];
-    memcpy(outBuf, data_packet->nx_packet_prepend_ptr, length);
-    outBuf[length] = '\0';
-    nx_packet_release(data_packet);
-    printf("Got data: %s\n", outBuf);
 
-    // notify
-    HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);
-    HAL_Delay(50);
-    HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);
+    Action__Command* proto_packet = NULL;
+    proto_packet = action__command__unpack(&allocator, length, data_packet->nx_packet_prepend_ptr);
+    if (proto_packet == NULL) {
+      printf("Failed to parse protobuf message\r\n");
+    } else {
+      printf("cmd: %i, robot: %i\r\n", proto_packet->command_id, proto_packet->robot_id);
+    }
+
+    taken = 0;
+    nx_packet_release(data_packet);
   }
 }
 /* USER CODE END 1 */
