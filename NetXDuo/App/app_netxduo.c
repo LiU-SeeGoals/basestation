@@ -25,8 +25,8 @@
 #include "nxd_dhcp_client.h"
 /* USER CODE BEGIN Includes */
 #include "main.h"
-#include <protobuf-c/protobuf-c.h>
-#include <protobuf-c/ssl_wrapper.pb-c.h>
+#include <ssl_wrapper.pb-c.h>
+//#include <robot_action.pb-c.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -485,9 +485,9 @@ static VOID udp_socket_receive_vision(NX_UDP_SOCKET *socket_ptr)
     SSLWrapperPacket* packet = NULL;
     packet = ssl__wrapper_packet__unpack(&allocator, length, data_packet->nx_packet_prepend_ptr);
     if (packet == NULL) {
-    	printf("Failed to parse protobuf message\n");
+    	printf("Failed to parse protobuf message\r\n");
     } else {
-    	printf("Got protobuf msg\n");
+    	printf("Got protobuf msg\r\n");
     }
     taken = 0;
     /*pb_istream_t input = pb_istream_from_buffer(data_packet->nx_packet_prepend_ptr, length);
