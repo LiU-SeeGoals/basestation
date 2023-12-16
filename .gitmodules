@@ -4,9 +4,6 @@
 [submodule "proto-messages"]
 	path = proto-messages
 	url = git@github.com:LiU-SeeGoals/proto-messages.git
-[submodule "nanopb"]
-	path = nanopb
-	url = git@github.com:nanopb/nanopb.git
 [submodule "Libraries/proto-messages"]
 	path = Libraries/proto-messages
 	url = git@github.com:LiU-SeeGoals/proto-messages.git

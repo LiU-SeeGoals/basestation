@@ -25,9 +25,11 @@
 #include "nxd_dhcp_client.h"
 /* USER CODE BEGIN Includes */
 #include "main.h"
-#include <ssl_wrapper.pb-c.h>
-#include <robot_action.pb-c.h>
 #include <nrf24l01.h>
+#include <pb_encode.h>
+#include <pb_decode.h>
+#include <ssl_wrapper.pb.h>
+#include <robot_action.pb.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -478,11 +480,14 @@ static UINT parse_packet(NX_PACKET* packet, int packet_type) {
   switch(packet_type) {
     case SSL_WRAPPER:
       {
-        SSLWrapperPacket* proto_packet = NULL;
+        SSL_WrapperPacket proto_packet;
         int length = packet->nx_packet_append_ptr - packet->nx_packet_prepend_ptr;
-        proto_packet = ssl__wrapper_packet__unpack(NULL, length, packet->nx_packet_prepend_ptr);
-        if (proto_packet == NULL) {
+        pb_istream_t stream = pb_istream_from_buffer(packet->nx_packet_prepend_ptr, length);
+        bool status = pb_decode(&stream, action_Command_fields, &proto_packet);
+        if (!status) {
           ret = NX_INVALID_PACKET;
+        } else {
+          printf("received msg\r\n");
         }
         // TODO: we need to extract the interesting data that is supposed
         // to be sent to each robot, then queue them up and send them
@@ -495,7 +500,7 @@ static UINT parse_packet(NX_PACKET* packet, int packet_type) {
           ret = NX_INVALID_PACKET;
         } else {
           NRF_Transmit(packet->nx_packet_prepend_ptr, length);
-          printf("RF transmit len: %d\r\n", length);
+          printf("[RF] tx len: %d\r\n", length);
         }
       }
       break;

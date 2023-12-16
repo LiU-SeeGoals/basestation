@@ -64,9 +64,9 @@
 									<listOptionValue builtIn="false" value="../Middlewares/ST/netxduo/common/drivers/ethernet"/>
 									<listOptionValue builtIn="false" value="../Drivers/BSP/Components/lan8742"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/basestation/Libraries/nRF24L01P-lib}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/basestation/Libraries/protobuf-c}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/basestation/Libraries/proto-messages/robot_action}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/basestation/Libraries/proto-messages/ssl_vision}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/basestation/Libraries/nanopb/Inc}&quot;"/>
 								</option>
 								<inputType id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.compiler.input.c.1389748049" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.compiler.input.c"/>
 							</tool>
@@ -98,9 +98,9 @@
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Core"/>
 						<entry excluding="nRF24L01P-lib/examples" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Drivers"/>
 						<entry excluding="examples" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Libraries/nRF24L01P-lib"/>
+						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Libraries/nanopb/Src"/>
 						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Libraries/proto-messages/robot_action"/>
 						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Libraries/proto-messages/ssl_vision"/>
-						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Libraries/protobuf-c"/>
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Middlewares"/>
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="NetXDuo"/>
 					</sourceEntries>
@@ -271,7 +271,7 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/basestation/Libraries/nRF24L01P-lib}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/basestation/Libraries/proto-messages/robot_action}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/basestation/Libraries/proto-messages/ssl_vision}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/basestation/Libraries/protobuf-c}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/basestation/Libraries/nanopb/Inc}&quot;"/>
 								</option>
 								<inputType id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.compiler.input.c.48444018" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.compiler.input.c"/>
 							</tool>
@@ -302,9 +302,9 @@
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Core"/>
 						<entry excluding="nRF24L01P-lib/examples" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Drivers"/>
 						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Libraries/nRF24L01P-lib"/>
+						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Libraries/nanopb/Src"/>
 						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Libraries/proto-messages/robot_action"/>
 						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Libraries/proto-messages/ssl_vision"/>
-						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Libraries/protobuf-c"/>
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Middlewares"/>
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="NetXDuo"/>
 					</sourceEntries>
