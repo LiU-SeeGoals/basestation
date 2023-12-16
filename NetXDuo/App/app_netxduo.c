@@ -25,9 +25,9 @@
 #include "nxd_dhcp_client.h"
 /* USER CODE BEGIN Includes */
 #include "main.h"
-#include "ssl_detection_tracked.pb-c.h"
 #include <ssl_wrapper.pb-c.h>
 #include <robot_action.pb-c.h>
+#include <nrf24l01.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -57,12 +57,10 @@ ULONG               Netmask;
 TX_THREAD           NxUDPThread;
 TX_THREAD           NxLinkThread;
 NX_UDP_SOCKET       visionSocket;
-NX_UDP_SOCKET       rawSocket;
+NX_UDP_SOCKET       controllerSocket;
 ULONG               VISION_PORT = 10020;
-ULONG               RAW_PORT = 6001;
+ULONG               CONTROLLER_PORT = 6001;
 ULONG               QUEUE_MAX_SIZE = 512;
-size_t              taken = 0;
-ProtobufCAllocator  allocator;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -73,6 +71,7 @@ static VOID nx_link_thread_entry(ULONG thread_input);
 static VOID nx_udp_thread_entry(ULONG thread_input);
 static VOID udp_socket_receive_vision(NX_UDP_SOCKET *socket_ptr);
 static VOID udp_socket_receive_controller(NX_UDP_SOCKET *socket_ptr);
+static UINT parse_packet(NX_PACKET* packet, int packet_type);
 /* USER CODE END PFP */
 
 /**
@@ -336,31 +335,8 @@ static VOID nx_app_thread_entry (ULONG thread_input)
   /* USER CODE END Nx_App_Thread_Entry 2 */
 
 }
+
 /* USER CODE BEGIN 1 */
-static void* memAlloc(void* allocatorData, size_t size) {
-	static char buffer[1024];
-	size_t padding = 0;
-  void* ptr;
-
-	if (taken + size > 1024) {
-		printf("Out of memory\n");
-		return NULL;
-	}
-
-	if (taken % 4 != 0) {
-		padding = 4 - taken % 4;
-	}
-
-	ptr = buffer + taken + padding;
-	taken += size + padding;
-	return ptr;
-}
-
-static void memFree(void* allocatorData, void* ptr) {
-	(void) allocatorData;
-	(void) ptr;
-}
-
 static VOID nx_link_thread_entry(ULONG thread_input)
 {
   ULONG status;
@@ -440,7 +416,7 @@ static VOID nx_udp_thread_entry (ULONG thread_input)
   printf("Waiting for Proto packets on port %lu...\r\n", VISION_PORT);
 
   ret = nx_udp_socket_create(&NetXDuoEthIpInstance,
-                             &rawSocket,
+                             &controllerSocket,
                              "UDP Client Socket",
                              NX_IP_NORMAL,
                              NX_FRAGMENT_OKAY,
@@ -450,16 +426,16 @@ static VOID nx_udp_thread_entry (ULONG thread_input)
     Error_Handler();
   }
 
-  ret = nx_udp_socket_bind(&rawSocket, RAW_PORT, TX_WAIT_FOREVER);
+  ret = nx_udp_socket_bind(&controllerSocket, CONTROLLER_PORT, TX_WAIT_FOREVER);
   if (ret != NX_SUCCESS) {
     Error_Handler();
   }
 
-  ret = nx_udp_socket_receive_notify(&rawSocket, udp_socket_receive_controller);
+  ret = nx_udp_socket_receive_notify(&controllerSocket, udp_socket_receive_controller);
   if (ret != NX_SUCCESS) {
     Error_Handler();
   }
-  printf("Waiting for robot actions on port %lu...\r\n", RAW_PORT);
+  printf("Waiting for robot actions on port %lu...\r\n", CONTROLLER_PORT);
 
   ret = nx_igmp_multicast_join(&NetXDuoEthIpInstance, IP_ADDRESS(224,5,23,2));
   if (ret != NX_SUCCESS) {
@@ -467,9 +443,6 @@ static VOID nx_udp_thread_entry (ULONG thread_input)
   } else {
     printf("Joined multicast group 224.5.23.2\r\n");
   }
-
-  allocator.alloc = &memAlloc;
-  allocator.free = &memFree;
 
   tx_thread_relinquish();
 }
@@ -481,23 +454,7 @@ static VOID udp_socket_receive_vision(NX_UDP_SOCKET *socket_ptr)
 
   ret = nx_udp_socket_receive(socket_ptr, &data_packet, NX_APP_DEFAULT_TIMEOUT);
   if (ret == NX_SUCCESS) {
-    int length = data_packet->nx_packet_append_ptr - data_packet->nx_packet_prepend_ptr;
-    SSLWrapperPacket* packet = NULL;
-    packet = ssl__wrapper_packet__unpack(&allocator, length, data_packet->nx_packet_prepend_ptr);
-    if (packet == NULL) {
-    	printf("Failed to parse protobuf message\r\n");
-    } else {
-    	printf("Got protobuf msg\r\n");
-    }
-    taken = 0;
-    /*pb_istream_t input = pb_istream_from_buffer(data_packet->nx_packet_prepend_ptr, length);
-    SSL_DetectionFrame msg;
-    bool res = pb_decode(&input, SSL_DetectionFrame_fields, &msg);
-    if (res) {
-      printf("Got protobuf msg: %ld\n", msg.camera_id);
-    } else {
-      printf("Failed to parse protobuf message\n");
-    }*/
+    parse_packet(data_packet, SSL_WRAPPER);
     nx_packet_release(data_packet);
   }
 }
@@ -509,18 +466,45 @@ static VOID udp_socket_receive_controller(NX_UDP_SOCKET *socket_ptr)
 
   ret = nx_udp_socket_receive(socket_ptr, &data_packet, NX_APP_DEFAULT_TIMEOUT);
   if (ret == NX_SUCCESS) {
-    int length = data_packet->nx_packet_append_ptr - data_packet->nx_packet_prepend_ptr;
-
-    Action__Command* proto_packet = NULL;
-    proto_packet = action__command__unpack(&allocator, length, data_packet->nx_packet_prepend_ptr);
-    if (proto_packet == NULL) {
-      printf("Failed to parse protobuf message\r\n");
-    } else {
-      printf("cmd: %i, robot: %i\r\n", proto_packet->command_id, proto_packet->robot_id);
-    }
-
-    taken = 0;
+    parse_packet(data_packet, ROBOT_COMMAND);
     nx_packet_release(data_packet);
   }
+
+}
+
+static UINT parse_packet(NX_PACKET* packet, int packet_type) {
+  UINT ret = NX_SUCCESS;
+
+  switch(packet_type) {
+    case SSL_WRAPPER:
+      {
+        SSLWrapperPacket* proto_packet = NULL;
+        int length = packet->nx_packet_append_ptr - packet->nx_packet_prepend_ptr;
+        proto_packet = ssl__wrapper_packet__unpack(NULL, length, packet->nx_packet_prepend_ptr);
+        if (proto_packet == NULL) {
+          ret = NX_INVALID_PACKET;
+        }
+        // TODO: we need to extract the interesting data that is supposed
+        // to be sent to each robot, then queue them up and send them
+      }
+      break;
+    case ROBOT_COMMAND:
+      {
+        int length = packet->nx_packet_append_ptr - packet->nx_packet_prepend_ptr;
+        if (length > 32) {
+          ret = NX_INVALID_PACKET;
+        } else {
+          NRF_Transmit(packet->nx_packet_prepend_ptr, length);
+          printf("RF transmit len: %d\r\n", length);
+        }
+      }
+      break;
+  }
+
+  if (ret != NX_SUCCESS) {
+    printf("Failed to parse UDP packet\r\n");
+  }
+
+  return ret;
 }
 /* USER CODE END 1 */

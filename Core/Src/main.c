@@ -66,7 +66,7 @@ static void MX_USART3_UART_Init(void);
 static void MX_ICACHE_Init(void);
 static void MX_SPI1_Init(void);
 /* USER CODE BEGIN PFP */
-void NRF_Setup(void);
+void rf_init(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -113,7 +113,7 @@ int main(void)
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
   printf("\r\n\r\n");
-  NRF_Setup();
+  rf_init();
   printf("Initialised...\r\n");
   /* USER CODE END 2 */
 
@@ -464,17 +464,11 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-// We've configured the user button to interrupt on rising edge.
 void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin) {
   switch (GPIO_Pin) {
     case BTN_USER_Pin:
-      // Print info.
       NRF_PrintStatus();
       NRF_PrintFIFOStatus();
-
-      // Send special message.
-      uint8_t special[19] = "user button pressed";
-      NRF_Transmit(special, 19);
       break;
     default:
       printf("Unhandled rising interrupt...\r\n");
@@ -482,8 +476,6 @@ void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin) {
   }
 }
 
-// We've configured the NRF_IRQ to trigger interrupt
-// callback on falling edge.
 void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin) {
   switch (GPIO_Pin) {
     case NRF_IRQ_Pin:
@@ -492,7 +484,7 @@ void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin) {
         if (status & (1<<4)) {
           // Reset MAX_RT in status register.
           NRF_SetRegisterBit(NRF_REG_STATUS, 4);
-          printf("Message not received, max retries...\r\n");
+          //printf("Message not received, max retries...\r\n");
         }
 
         if (status & (1<<5)) {
@@ -500,7 +492,7 @@ void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin) {
           // This means we've gotten an ACK from the receiver
           // and the message was thus succesfully received.
           NRF_SetRegisterBit(NRF_REG_STATUS, 5); // Reset TX_DS
-          printf("Successful sent...\r\n");
+          //printf("Successful sent...\r\n");
         }
 
         if (status & (1<<6)) {
@@ -509,11 +501,11 @@ void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin) {
           NRF_SendReadCommand(NRF_CMD_R_RX_PL_WID, &length, 1);
           uint8_t payload[length];
           NRF_ReadPayload(payload, length);
-          printf("Received data: ");
-          for (int i = 0; i < length; i++) {
-            printf("%c", payload[i]);
-          }
-          printf("\r\n");
+          //printf("Received data: ");
+          //for (int i = 0; i < length; i++) {
+            //printf("%c", payload[i]);
+          //}
+          //printf("\r\n");
           NRF_SetRegisterBit(NRF_REG_STATUS, 6); // Reset RX_DR
         }
       }
@@ -524,12 +516,12 @@ void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin) {
   }
 }
 
-void NRF_Setup(void) {
+void rf_init(void) {
   uint8_t address[5] = {1,2,3,4,5};
 
   NRF_Init(&hspi1, NRF_CSN_GPIO_Port, NRF_CSN_Pin, NRF_CE_GPIO_Port, NRF_CE_Pin);
   if(NRF_VerifySPI() != NRF_OK) {
-    printf("[NRF] Couldn't verify nRF24...\r\n");
+    printf("[RF] Couldn't verify nRF24...\r\n");
   }
 
   // Resets all registers but keeps the device in standby-I mode
