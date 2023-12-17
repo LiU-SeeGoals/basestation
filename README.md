@@ -1,5 +1,17 @@
 # Basestation
-At the time of writing no Makefile project could be produced for the H5 CPU. So this project has to be imported into STM32CubeIDE.
+This is the firmware for the basestation (NUCLEO-H563ZI) which parses messages from the controller and ssl-vision and then sends it to the robots.
+
+## Contributing
+Make sure to follow the [firmware standard](https://github.com/LiU-SeeGoals/wiki/wiki/1.-Processes-&-Standards#seegoal---firmware-standard) and the [feature branch](https://github.com/LiU-SeeGoals/wiki/wiki/1.-Processes-&-Standards#feature-branch-integration) concept.
+
+## Building and flashing
+This project has to be compiled and flashed through the STM32CubeIDE.
+
+There are two compiling options used, `Debug` is used to compile the project, `Compiledb` uses [compiledb](https://github.com/nickdiego/compiledb) to produce a `compile_commands.json` file which can be used with your LSP powered IDE of choice.
+
+By running the project through STM32CubeIDE and having the NUCLEO card connected through USB (st-link marked port) the binary is flashed to the MCU.
+
+# Documentation
 
 ## Sheets
 [NUCLEO-H563ZI](https://www.st.com/resource/en/user_manual/um3115-stm32h5-nucleo144-board-mb1404-stmicroelectronics.pdf)
@@ -32,6 +44,7 @@ At the time of writing no Makefile project could be produced for the H5 CPU. So 
 | -             | PG13    | ETH_TXD0       | -       | ETH_TXD0    | -            |
 
 ## MX configuration
+If for some reason a new `basestation.ioc` has to be created from scratch, these are the changes needed in of STM32CubeMX.
 
 ### General stuff
 Make sure global interrupts are enabled beneath NVIC (preemption priority set to 7).  
