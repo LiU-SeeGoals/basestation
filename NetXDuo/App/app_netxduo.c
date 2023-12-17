@@ -279,7 +279,7 @@ static VOID ip_address_change_notify_callback(NX_IP *ip_instance, VOID *ptr)
 {
   /* USER CODE BEGIN ip_address_change_notify_callback */
   nx_ip_address_get(ip_instance, &IPAddress, &Netmask);
-  printf("Got IP: %lu.%lu.%lu.%lu \r\n", (IPAddress >> 24) & 0xff,
+  printf("[NX] Got IP: %lu.%lu.%lu.%lu \r\n", (IPAddress >> 24) & 0xff,
 										 (IPAddress >> 16) & 0xff,
 										 (IPAddress >> 8) & 0xff,
 										 (IPAddress & 0xff));
@@ -351,7 +351,7 @@ static VOID nx_link_thread_entry(ULONG thread_input)
     if (ret != NX_SUCCESS) {
       if (linkdown != 1) {
         linkdown = 1;
-        printf("Link down...\r\n");
+        printf("[NX] Link down...\r\n");
         HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_SET);
         HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
       }
@@ -363,16 +363,16 @@ static VOID nx_link_thread_entry(ULONG thread_input)
     } else {
       if (linkdown == 1) {
         linkdown = 0;
-        printf("Link up...\r\n");
+        printf("[NX] Link up...\r\n");
 
         ret = nx_ip_interface_status_check(&NetXDuoEthIpInstance, 0, NX_IP_ADDRESS_RESOLVED, &status, 10);
 
         if (ret == NX_SUCCESS) {
-          printf("IP resolved...\r\n");
+          printf("[NX] IP resolved...\r\n");
           HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
           HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_RESET);
         } else {
-          printf("IP not resolved...\r\n");
+          printf("[NX] IP not resolved...\r\n");
           HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
           HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_SET);
           nx_ip_driver_direct_command(&NetXDuoEthIpInstance, NX_LINK_ENABLE, &status);
@@ -415,7 +415,7 @@ static VOID nx_udp_thread_entry (ULONG thread_input)
     Error_Handler();
   }
 
-  printf("Waiting for Proto packets on port %lu...\r\n", VISION_PORT);
+  printf("[NX] Waiting for Proto packets on port %lu...\r\n", VISION_PORT);
 
   ret = nx_udp_socket_create(&NetXDuoEthIpInstance,
                              &controllerSocket,
@@ -437,13 +437,13 @@ static VOID nx_udp_thread_entry (ULONG thread_input)
   if (ret != NX_SUCCESS) {
     Error_Handler();
   }
-  printf("Waiting for robot actions on port %lu...\r\n", CONTROLLER_PORT);
+  printf("[NX] Waiting for robot actions on port %lu...\r\n", CONTROLLER_PORT);
 
   ret = nx_igmp_multicast_join(&NetXDuoEthIpInstance, IP_ADDRESS(224,5,23,2));
   if (ret != NX_SUCCESS) {
-    printf("Failed joining multicast group: %u\r\n", ret);
+    printf("[NX] Failed joining multicast group: %u\r\n", ret);
   } else {
-    printf("Joined multicast group 224.5.23.2\r\n");
+    printf("[NX] Joined multicast group 224.5.23.2\r\n");
   }
 
   tx_thread_relinquish();
@@ -487,7 +487,7 @@ static UINT parse_packet(NX_PACKET* packet, int packet_type) {
         if (!status) {
           ret = NX_INVALID_PACKET;
         } else {
-          printf("received msg\r\n");
+          printf("[NX] received msg\r\n");
         }
         // TODO: we need to extract the interesting data that is supposed
         // to be sent to each robot, then queue them up and send them
@@ -507,7 +507,7 @@ static UINT parse_packet(NX_PACKET* packet, int packet_type) {
   }
 
   if (ret != NX_SUCCESS) {
-    printf("Failed to parse UDP packet\r\n");
+    printf("[NX] Failed to parse UDP packet\r\n");
   }
 
   return ret;

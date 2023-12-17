@@ -114,7 +114,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
   printf("\r\n\r\n");
   rf_init();
-  printf("Initialised...\r\n");
+  printf("[MAIN] Initialised...\r\n");
   /* USER CODE END 2 */
 
   MX_ThreadX_Init();
