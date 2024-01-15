@@ -26,10 +26,10 @@
 /* USER CODE BEGIN Includes */
 #include "main.h"
 #include <nrf24l01.h>
-#include <pb_encode.h>
-#include <pb_decode.h>
-#include <ssl_wrapper.pb.h>
-#include <robot_action.pb.h>
+
+#include <protobuf-c/protobuf-c.h>
+#include <protobuf-c/robot_action.pb-c.h>
+#include <protobuf-c/ssl_wrapper.pb-c.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -339,6 +339,30 @@ static VOID nx_app_thread_entry (ULONG thread_input)
 }
 
 /* USER CODE BEGIN 1 */
+size_t allocator_taken = 0;
+ProtobufCAllocator allocator;
+
+static void* memAlloc(void* allocatorData, size_t size) {
+	static char buffer[1024];
+	if (allocator_taken + size > 1024) {
+		printf("Out of memory\n");
+		return NULL;
+	}
+	size_t padding = 0;
+	if (allocator_taken % 4 != 0) {
+		padding = 4 - allocator_taken % 4;
+	}
+	void* ptr = buffer + allocator_taken + padding;
+	allocator_taken += size + padding;
+	return ptr;
+}
+
+static void memFree(void* allocatorData, void* ptr) {
+	(void) allocatorData;
+	(void) ptr;
+}
+
+
 static VOID nx_link_thread_entry(ULONG thread_input)
 {
   ULONG status;
@@ -480,15 +504,16 @@ static UINT parse_packet(NX_PACKET* packet, int packet_type) {
   switch(packet_type) {
     case SSL_WRAPPER:
       {
-        SSL_WrapperPacket proto_packet;
         int length = packet->nx_packet_append_ptr - packet->nx_packet_prepend_ptr;
-        pb_istream_t stream = pb_istream_from_buffer(packet->nx_packet_prepend_ptr, length);
-        bool status = pb_decode(&stream, action_Command_fields, &proto_packet);
-        if (!status) {
+        SSLWrapperPacket* ssl_packet = NULL;
+        ssl_packet = ssl__wrapper_packet__unpack(&allocator, length, packet->nx_packet_prepend_ptr);
+        if (ssl_packet == NULL) {
           ret = NX_INVALID_PACKET;
         } else {
           printf("[NX] received msg\r\n");
         }
+        // Free the memory.
+        allocator_taken = 0;
         // TODO: we need to extract the interesting data that is supposed
         // to be sent to each robot, then queue them up and send them
       }
