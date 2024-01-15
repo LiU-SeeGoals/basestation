@@ -469,6 +469,8 @@ static VOID nx_udp_thread_entry (ULONG thread_input)
   } else {
     printf("[NX] Joined multicast group 224.5.23.2\r\n");
   }
+  allocator.alloc = &memAlloc;
+  allocator.free = &memFree;
 
   tx_thread_relinquish();
 }
