@@ -25,11 +25,7 @@
 #include "nxd_dhcp_client.h"
 /* USER CODE BEGIN Includes */
 #include "main.h"
-#include <nrf24l01.h>
-
-#include <protobuf-c/protobuf-c.h>
-#include <protobuf-c/robot_action.pb-c.h>
-#include <protobuf-c/ssl_wrapper.pb-c.h>
+#include "handle_packet.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -73,7 +69,6 @@ static VOID nx_link_thread_entry(ULONG thread_input);
 static VOID nx_udp_thread_entry(ULONG thread_input);
 static VOID udp_socket_receive_vision(NX_UDP_SOCKET *socket_ptr);
 static VOID udp_socket_receive_controller(NX_UDP_SOCKET *socket_ptr);
-static UINT parse_packet(NX_PACKET* packet, int packet_type);
 /* USER CODE END PFP */
 
 /**
@@ -339,28 +334,6 @@ static VOID nx_app_thread_entry (ULONG thread_input)
 }
 
 /* USER CODE BEGIN 1 */
-size_t allocator_taken = 0;
-ProtobufCAllocator allocator;
-
-static void* memAlloc(void* allocatorData, size_t size) {
-	static char buffer[1024];
-	if (allocator_taken + size > 1024) {
-		printf("Out of memory\n");
-		return NULL;
-	}
-	size_t padding = 0;
-	if (allocator_taken % 4 != 0) {
-		padding = 4 - allocator_taken % 4;
-	}
-	void* ptr = buffer + allocator_taken + padding;
-	allocator_taken += size + padding;
-	return ptr;
-}
-
-static void memFree(void* allocatorData, void* ptr) {
-	(void) allocatorData;
-	(void) ptr;
-}
 
 
 static VOID nx_link_thread_entry(ULONG thread_input)
@@ -469,8 +442,6 @@ static VOID nx_udp_thread_entry (ULONG thread_input)
   } else {
     printf("[NX] Joined multicast group 224.5.23.2\r\n");
   }
-  allocator.alloc = &memAlloc;
-  allocator.free = &memFree;
 
   tx_thread_relinquish();
 }
@@ -498,45 +469,5 @@ static VOID udp_socket_receive_controller(NX_UDP_SOCKET *socket_ptr)
     nx_packet_release(data_packet);
   }
 
-}
-
-static UINT parse_packet(NX_PACKET* packet, int packet_type) {
-  UINT ret = NX_SUCCESS;
-
-  switch(packet_type) {
-    case SSL_WRAPPER:
-      {
-        int length = packet->nx_packet_append_ptr - packet->nx_packet_prepend_ptr;
-        SSLWrapperPacket* ssl_packet = NULL;
-        ssl_packet = ssl__wrapper_packet__unpack(&allocator, length, packet->nx_packet_prepend_ptr);
-        if (ssl_packet == NULL) {
-          ret = NX_INVALID_PACKET;
-        } else {
-          printf("[NX] received msg\r\n");
-        }
-        // Free the memory.
-        allocator_taken = 0;
-        // TODO: we need to extract the interesting data that is supposed
-        // to be sent to each robot, then queue them up and send them
-      }
-      break;
-    case ROBOT_COMMAND:
-      {
-        int length = packet->nx_packet_append_ptr - packet->nx_packet_prepend_ptr;
-        if (length > 32) {
-          ret = NX_INVALID_PACKET;
-        } else {
-          NRF_Transmit(packet->nx_packet_prepend_ptr, length);
-          printf("[RF] tx len: %d\r\n", length);
-        }
-      }
-      break;
-  }
-
-  if (ret != NX_SUCCESS) {
-    printf("[NX] Failed to parse UDP packet\r\n");
-  }
-
-  return ret;
 }
 /* USER CODE END 1 */

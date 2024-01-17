@@ -89,7 +89,6 @@ UINT MX_NetXDuo_Init(VOID *memory_ptr);
 #define NX_APP_DEFAULT_NET_MASK                     0
 
 /* USER CODE BEGIN 1 */
-enum PACKET_TYPE {SSL_WRAPPER, ROBOT_COMMAND};
 /* USER CODE END 1 */
 
 #ifdef __cplusplus
