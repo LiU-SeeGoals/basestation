@@ -501,12 +501,20 @@ void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin) {
           NRF_SendReadCommand(NRF_CMD_R_RX_PL_WID, &length, 1);
           uint8_t payload[length];
           NRF_ReadPayload(payload, length);
-          //printf("Received data: ");
-          //for (int i = 0; i < length; i++) {
-            //printf("%c", payload[i]);
-          //}
-          //printf("\r\n");
+          // 4 byte magic, 1 byte identifier
+          if (length == 5) {
+        	  uint32_t magic = payload[0] << 24 | (payload[1] << 16) | (payload[2] << 8) | (payload[3]);
+        	  if (magic == 0x4df84279) {
+        	      uint8_t id = payload[4];
+        	      printf("Robot %d connected\n", id);
+        	  } else {
+        		  printf("Received invalid packet: 0x%#08x\n", magic );
+        	  }
+          } else {
+        	  printf("Received invalid length packet\n");
+          }
           NRF_SetRegisterBit(NRF_REG_STATUS, 6); // Reset RX_DR
+
         }
       }
       break;
@@ -545,6 +553,9 @@ void rf_init(void) {
 
   // Enables dynamic payload on pipe 0.
   NRF_SetRegisterBit(NRF_REG_DYNPD, 0);
+  // Enter receive mode
+  NRF_EnterMode(NRF_MODE_RX);
+  printf("Rf initialized\n");
 }
 /* USER CODE END 4 */
 

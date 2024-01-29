@@ -51,7 +51,12 @@ UINT parse_packet(NX_PACKET* packet, PACKET_TYPE packet_type) {
         if (length > 32) {
           ret = NX_INVALID_PACKET;
         } else {
-          NRF_Transmit(packet->nx_packet_prepend_ptr, length);
+          NRF_EnterMode(NRF_MODE_STANDBY1);
+
+          if (NRF_OK != NRF_Transmit(packet->nx_packet_prepend_ptr, length)) {
+        	  printf("Failed transmit\n");
+          }
+          NRF_EnterMode(NRF_MODE_RX);
           printf("[RF] tx len: %d\r\n", length);
         }
       }
