@@ -23,7 +23,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "nrf24l01.h"
+#include "com.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -66,15 +66,39 @@ static void MX_USART3_UART_Init(void);
 static void MX_ICACHE_Init(void);
 static void MX_SPI1_Init(void);
 /* USER CODE BEGIN PFP */
-void rf_init(void);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+// Printf redirect to uart
 PUTCHAR_PROTOTYPE
 {
   HAL_UART_Transmit(&huart3, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
   return ch;
+}
+
+void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin) {
+  switch (GPIO_Pin) {
+    case BTN_USER_Pin:
+      COM_RF_PrintInfo();
+      break;
+    default:
+      printf("Unhandled rising interrupt...\r\n");
+      break;
+  }
+}
+
+void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin) {
+  switch (GPIO_Pin) {
+    case NRF_IRQ_Pin:
+      COM_RF_HandleIRQ();
+      break;
+    default:
+      printf("Unhandled falling interrupt...\r\n");
+      break;
+  }
 }
 /* USER CODE END 0 */
 
@@ -113,7 +137,7 @@ int main(void)
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
   printf("\r\n\r\n");
-  rf_init();
+  COM_Init(&hspi1);
   printf("[MAIN] Initialised...\r\n");
   /* USER CODE END 2 */
 
@@ -464,99 +488,7 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin) {
-  switch (GPIO_Pin) {
-    case BTN_USER_Pin:
-      NRF_PrintStatus();
-      NRF_PrintFIFOStatus();
-      break;
-    default:
-      printf("Unhandled rising interrupt...\r\n");
-      break;
-  }
-}
 
-void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin) {
-  switch (GPIO_Pin) {
-    case NRF_IRQ_Pin:
-      {
-        uint8_t status = NRF_ReadStatus();
-        if (status & (1<<4)) {
-          // Reset MAX_RT in status register.
-          NRF_SetRegisterBit(NRF_REG_STATUS, 4);
-          //printf("Message not received, max retries...\r\n");
-        }
-
-        if (status & (1<<5)) {
-          // TX_DS is set in status register.
-          // This means we've gotten an ACK from the receiver
-          // and the message was thus succesfully received.
-          NRF_SetRegisterBit(NRF_REG_STATUS, 5); // Reset TX_DS
-          //printf("Successful sent...\r\n");
-        }
-
-        if (status & (1<<6)) {
-          // RX_DR
-          uint8_t length = 0x00;
-          NRF_SendReadCommand(NRF_CMD_R_RX_PL_WID, &length, 1);
-          uint8_t payload[length];
-          NRF_ReadPayload(payload, length);
-          // 4 byte magic, 1 byte identifier
-          if (length == 5) {
-        	  uint32_t magic = payload[0] << 24 | (payload[1] << 16) | (payload[2] << 8) | (payload[3]);
-        	  if (magic == 0x4df84279) {
-        	      uint8_t id = payload[4];
-        	      printf("Robot %d connected\n", id);
-        	  } else {
-        		  printf("Received invalid packet: 0x%#08x\n", magic );
-        	  }
-          } else {
-        	  printf("Received invalid length packet\n");
-          }
-          NRF_SetRegisterBit(NRF_REG_STATUS, 6); // Reset RX_DR
-
-        }
-      }
-      break;
-    default:
-      printf("Unhandled falling interrupt...\r\n");
-      break;
-  }
-}
-
-void rf_init(void) {
-  uint8_t address[5] = {1,2,3,4,5};
-
-  NRF_Init(&hspi1, NRF_CSN_GPIO_Port, NRF_CSN_Pin, NRF_CE_GPIO_Port, NRF_CE_Pin);
-  if(NRF_VerifySPI() != NRF_OK) {
-    printf("[RF] Couldn't verify nRF24...\r\n");
-  }
-
-  // Resets all registers but keeps the device in standby-I mode
-  NRF_Reset();
-
-  // Set the RF channel frequency, it's defined as: 2400 + NRF_REG_RF_CH [MHz]
-  NRF_WriteRegisterByte(NRF_REG_RF_CH, 0x0F);
-
-  // Setup the TX address.
-  // We also have to set pipe 0 to receive on the same address.
-  NRF_WriteRegister(NRF_REG_TX_ADDR, address, 5);
-  NRF_WriteRegister(NRF_REG_RX_ADDR_P0, address, 5);
-
-  /* To enable ACK payloads we need to setup dynamic payload length. */
-
-  // Enables us to send custom payload with ACKs.
-  NRF_SetRegisterBit(NRF_REG_FEATURE, 1);
-
-  // Enables dynamic payload length generally.
-  NRF_SetRegisterBit(NRF_REG_FEATURE, 2);
-
-  // Enables dynamic payload on pipe 0.
-  NRF_SetRegisterBit(NRF_REG_DYNPD, 0);
-  // Enter receive mode
-  NRF_EnterMode(NRF_MODE_RX);
-  printf("Rf initialized\n");
-}
 /* USER CODE END 4 */
 
 /**
