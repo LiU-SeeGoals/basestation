@@ -5,7 +5,6 @@
 #include <protobuf-c/robot_action.pb-c.h>
 #include <protobuf-c/ssl_wrapper.pb-c.h>
 
-
 enum _PACKET_TYPE {SSL_WRAPPER, ROBOT_COMMAND};
 typedef enum _PACKET_TYPE PACKET_TYPE;
 
