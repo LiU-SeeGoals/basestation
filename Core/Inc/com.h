@@ -4,6 +4,12 @@
 /* Public includes */
 #include "main.h"
 
+#define MAX_ROBOT_COUNT 16
+
+#define CONTROLLER_ADDR {2, 255, 255, 255, 255}
+#define ROBOT_DATA_ADDR(id) {1, 255, 255, 255, id}
+#define ROBOT_ACTION_ADDR(id) {1, 255, 255, id, 255}
+#define ROBOT_PING_ADDR(id) {1, 255, id, 255, 255}
 
 /* Public function declarations */
 
@@ -30,5 +36,7 @@ void COM_RF_HandleIRQ(void);
  * Printf:s status and FIFO status registers from the NRF.
  */
 void COM_RF_PrintInfo(void);
+
+extern uint8_t connected_robots[MAX_ROBOT_COUNT];
 
 #endif /* COM_H */

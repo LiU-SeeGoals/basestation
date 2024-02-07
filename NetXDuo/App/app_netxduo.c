@@ -25,7 +25,7 @@
 #include "nxd_dhcp_client.h"
 /* USER CODE BEGIN Includes */
 #include "main.h"
-#include "handle_packet.h"
+#include <handle_packet.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -213,12 +213,6 @@ UINT MX_NetXDuo_Init(VOID *memory_ptr)
   tx_semaphore_create(&DHCPSemaphore, "DHCP Semaphore", 0);
 
   /* USER CODE BEGIN MX_NetXDuo_Init */
-
-  // Enable IGMP so we can subscribe to multicast groups
-  ret = nx_igmp_enable(&NetXDuoEthIpInstance);
-  if (ret != NX_SUCCESS) {
-    return NX_NOT_SUCCESSFUL;
-  }
 
   // Create the link thread
   if (tx_byte_allocate(byte_pool, (VOID **) &pointer, NX_APP_THREAD_STACK_SIZE, TX_NO_WAIT) != TX_SUCCESS)
@@ -435,13 +429,6 @@ static VOID nx_udp_thread_entry (ULONG thread_input)
     Error_Handler();
   }
   printf("[NX] Waiting for robot actions on port %lu...\r\n", CONTROLLER_PORT);
-
-  ret = nx_igmp_multicast_join(&NetXDuoEthIpInstance, IP_ADDRESS(224,5,23,2));
-  if (ret != NX_SUCCESS) {
-    printf("[NX] Failed joining multicast group: %u\r\n", ret);
-  } else {
-    printf("[NX] Joined multicast group 224.5.23.2\r\n");
-  }
 
   tx_thread_relinquish();
 }

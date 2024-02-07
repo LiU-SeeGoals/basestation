@@ -3,6 +3,8 @@
 /* Private includes */
 #include <nrf24l01.h>
 #include <nrf_helper_defines.h>
+#include <stdio.h>
+#include <string.h>
 
 /* Private defines */
 #define PIPE_CONTROLLER 0
@@ -18,7 +20,9 @@
  */
 
 void COM_Init(SPI_HandleTypeDef* hspi) {
-  uint8_t address[5] = {1,2,3,4,5};
+  uint8_t address[5] = CONTROLLER_ADDR;
+  // Mark all robots as disconnected
+  memset(connected_robots, MAX_ROBOT_COUNT, 0);
 
   NRF_Init(hspi, NRF_CSN_GPIO_Port, NRF_CSN_Pin, NRF_CE_GPIO_Port, NRF_CE_Pin);
   if(NRF_VerifySPI() != NRF_OK) {
@@ -33,7 +37,9 @@ void COM_Init(SPI_HandleTypeDef* hspi) {
 
   // Setup the TX address.
   // We also have to set pipe 0 to receive on the same address.
-  NRF_WriteRegister(NRF_REG_TX_ADDR,    address, 5);
+  uint8_t send_addr[5] = ROBOT_ACTION_ADDR(0);
+    uint8_t addr[5] = {1, 2, 3, 4, 5};
+  NRF_WriteRegister(NRF_REG_TX_ADDR,    send_addr, 5);
   NRF_WriteRegister(NRF_REG_RX_ADDR_P0, address, 5);
 
   // We enable ACK payloads which needs dynamic payload to function.
@@ -44,6 +50,12 @@ void COM_Init(SPI_HandleTypeDef* hspi) {
   // Setup for 3 max retries when sending and 500 us between each retry.
   // For motivation, see page 60 in datasheet.
   NRF_WriteRegisterByte(NRF_REG_SETUP_RETR, 0x13);
+
+  /*for (uint8_t id = 0; id < MAX_ROBOT_COUNT; ++id) {
+      uint8_t address[5] = ROBOT_PING_ADDR(id);
+      NRF_WriteRegister(NRF_REG_TX_ADDR, address, 5);
+      NRF_Transmit("ping", 4);
+  }*/
 
   // Enter receive mode
   NRF_EnterMode(NRF_MODE_RX);
@@ -76,6 +88,8 @@ void COM_RF_PrintInfo() {
   NRF_PrintConfig();
 }
 
+
+uint8_t connected_robots[MAX_ROBOT_COUNT];
 /*
  * Private function implementations
  */
@@ -91,11 +105,12 @@ void COM_RF_Receive(uint8_t pipe) {
 
   if (len == 5) {
     uint32_t magic = payload[0] << 24 | (payload[1] << 16) | (payload[2] << 8) | (payload[3]);
-    if (magic == 0x4df84279) {
-        uint8_t id = payload[4];
+    uint8_t id = payload[4];
+    if (magic == 0x4df84279 && id < MAX_ROBOT_COUNT) {
+    	connected_robots[id] = 1;
         printf("[COM_RF] Robot %d connected\r\n", id);
     } else {
-      printf("[COM_RF] Received invalid packet: 0x%#08x\r\n", magic);
+    	printf("[COM_RF] Received invalid packet: 0x%#08x\r\n", magic);
     }
   }
 
