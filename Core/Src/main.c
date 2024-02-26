@@ -23,7 +23,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "nrf24l01.h"
+#include <nrf24l01.h>
+#include <log.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -33,7 +34,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define PUTCHAR_PROTOTYPE int __io_putchar(int ch)
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -54,7 +55,7 @@ SPI_HandleTypeDef hspi1;
 UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN PV */
-
+static LOG_Module internal_log_mod;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -71,11 +72,7 @@ void rf_init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-PUTCHAR_PROTOTYPE
-{
-  HAL_UART_Transmit(&huart3, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
-  return ch;
-}
+
 /* USER CODE END 0 */
 
 /**
@@ -112,9 +109,10 @@ int main(void)
   MX_ICACHE_Init();
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
-  printf("\r\n\r\n");
+  LOG_Init(&huart3);
   rf_init();
-  printf("[MAIN] Initialised...\r\n");
+  LOG_InitModule(&internal_log_mod, "MAIN", LOG_LEVEL_INFO);
+  LOG_INFO("Startup finished...\r\n");
   /* USER CODE END 2 */
 
   MX_ThreadX_Init();
@@ -471,7 +469,7 @@ void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin) {
       NRF_PrintFIFOStatus();
       break;
     default:
-      printf("Unhandled rising interrupt...\r\n");
+      LOG_ERROR("Unhandled rising interrupt...\r\n");
       break;
   }
 }
@@ -484,7 +482,6 @@ void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin) {
         if (status & (1<<4)) {
           // Reset MAX_RT in status register.
           NRF_SetRegisterBit(NRF_REG_STATUS, 4);
-          //printf("Message not received, max retries...\r\n");
         }
 
         if (status & (1<<5)) {
@@ -492,7 +489,6 @@ void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin) {
           // This means we've gotten an ACK from the receiver
           // and the message was thus succesfully received.
           NRF_SetRegisterBit(NRF_REG_STATUS, 5); // Reset TX_DS
-          //printf("Successful sent...\r\n");
         }
 
         if (status & (1<<6)) {
@@ -501,17 +497,14 @@ void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin) {
           NRF_SendReadCommand(NRF_CMD_R_RX_PL_WID, &length, 1);
           uint8_t payload[length];
           NRF_ReadPayload(payload, length);
-          //printf("Received data: ");
           //for (int i = 0; i < length; i++) {
-            //printf("%c", payload[i]);
           //}
-          //printf("\r\n");
           NRF_SetRegisterBit(NRF_REG_STATUS, 6); // Reset RX_DR
         }
       }
       break;
     default:
-      printf("Unhandled falling interrupt...\r\n");
+      LOG_ERROR("Unhandled falling interrupt...\r\n");
       break;
   }
 }
@@ -521,7 +514,7 @@ void rf_init(void) {
 
   NRF_Init(&hspi1, NRF_CSN_GPIO_Port, NRF_CSN_Pin, NRF_CE_GPIO_Port, NRF_CE_Pin);
   if(NRF_VerifySPI() != NRF_OK) {
-    printf("[RF] Couldn't verify nRF24...\r\n");
+    LOG_ERROR("Couldn't verify nRF24...\r\n");
   }
 
   // Resets all registers but keeps the device in standby-I mode
