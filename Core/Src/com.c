@@ -38,23 +38,26 @@ void COM_Init(SPI_HandleTypeDef* hspi) {
   // Setup the TX address.
   // We also have to set pipe 0 to receive on the same address.
   uint8_t send_addr[5] = ROBOT_ACTION_ADDR(0);
-    uint8_t addr[5] = {1, 2, 3, 4, 5};
-  NRF_WriteRegister(NRF_REG_TX_ADDR,    send_addr, 5);
-  NRF_WriteRegister(NRF_REG_RX_ADDR_P0, address, 5);
+
+  NRF_WriteRegister(NRF_REG_TX_ADDR, send_addr, 5);
+  NRF_WriteRegister(NRF_REG_RX_ADDR_P0, send_addr, 5);
+  NRF_WriteRegister(NRF_REG_RX_ADDR_P1, address, 5);
 
   // We enable ACK payloads which needs dynamic payload to function.
   NRF_SetRegisterBit(NRF_REG_FEATURE, FEATURE_EN_ACK_PAY);
   NRF_SetRegisterBit(NRF_REG_FEATURE, FEATURE_EN_DPL);
-  NRF_SetRegisterBit(NRF_REG_DYNPD,   DYNPD_DPL_P0);
-
+  NRF_WriteRegisterByte(NRF_REG_DYNPD, 0x03);
   // Setup for 3 max retries when sending and 500 us between each retry.
   // For motivation, see page 60 in datasheet.
   NRF_WriteRegisterByte(NRF_REG_SETUP_RETR, 0x13);
 
-  /*for (uint8_t id = 0; id < MAX_ROBOT_COUNT; ++id) {
-      uint8_t address[5] = ROBOT_PING_ADDR(id);
-      NRF_WriteRegister(NRF_REG_TX_ADDR, address, 5);
-      NRF_Transmit("ping", 4);
+  /*NRF_EnterMode(NRF_MODE_STANDBY1);
+  for (uint8_t id = 0; id < MAX_ROBOT_COUNT; ++id) {
+      uint8_t addr[5] = ROBOT_PING_ADDR(id);
+      NRF_WriteRegister(NRF_REG_TX_ADDR, addr, 5);
+      NRF_WriteRegister(NRF_REG_RX_ADDR_P0, send_addr, 5);
+      uint8_t msg[] = {'P', 'i', 'n','g'};
+      NRF_Transmit(msg, 4);
   }*/
 
   // Enter receive mode

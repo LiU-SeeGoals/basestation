@@ -7,9 +7,9 @@
 #define MAX_ROBOT_COUNT 16
 
 #define CONTROLLER_ADDR {2, 255, 255, 255, 255}
-#define ROBOT_DATA_ADDR(id) {1, 255, 255, 255, id}
+#define ROBOT_DATA_ADDR(id) {1, 255, 255, id, 128}
 #define ROBOT_ACTION_ADDR(id) {1, 255, 255, id, 255}
-#define ROBOT_PING_ADDR(id) {1, 255, id, 255, 255}
+#define ROBOT_PING_ADDR(id) {1, 255, 255, id, 0}
 
 /* Public function declarations */
 
