@@ -71,12 +71,11 @@ void COM_Init(SPI_HandleTypeDef* hspi) {
   printf("[RF] Initialized...\r\n");
 }
 
-static uint8_t msg[] = {'P', 'i', 'n', 'g'};
+static uint8_t msg[] = {0, 'P', 'i', 'n', 'g'};
 
 void COM_RF_PingRobots() {
   uint8_t addr[5] = ROBOT_ACTION_ADDR(0);
-  addr[0] = 0;
-  COM_RF_Transmit(addr, msg, 4);
+  COM_RF_Transmit(addr, msg, 5);
   printf("[RF] Ping...\r\n");
 }
 

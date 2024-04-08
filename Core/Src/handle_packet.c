@@ -28,7 +28,7 @@ UINT parse_packet(NX_PACKET* packet, PACKET_TYPE packet_type) {
     case ROBOT_COMMAND:
       {
         int length = packet->nx_packet_append_ptr - packet->nx_packet_prepend_ptr;
-        if (length > 32) {
+        if (length > 31) {
           ret = NX_INVALID_PACKET;
         } else {
           Action__Command* command = NULL;
@@ -37,7 +37,10 @@ UINT parse_packet(NX_PACKET* packet, PACKET_TYPE packet_type) {
             ret = NX_INVALID_PACKET;
           } else {
             uint8_t address[5] = ROBOT_ACTION_ADDR(command->robot_id);
-            COM_RF_Transmit(address, packet->nx_packet_prepend_ptr, length);
+            uint8_t data[32];
+            data[0] = 1;
+            memcpy(data + 1, packet->nx_packet_prepend_ptr, length);
+            COM_RF_Transmit(address, data, length + 1);
             /*for (int i = 0; i < length; ++i) {
                 printf("%u,", packet->nx_packet_prepend_ptr[i]);
             }
