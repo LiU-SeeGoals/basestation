@@ -5,6 +5,7 @@
 #include <nrf_helper_defines.h>
 #include <stdio.h>
 #include <string.h>
+#include <tx_api.h>
 
 /* Private defines */
 #define PIPE_CONTROLLER 0
@@ -19,8 +20,16 @@
  * Public functions implementations
  */
 
+
+TX_SEMAPHORE semaphore;
+volatile TransmitStatus com_ack;
+
 void COM_Init(SPI_HandleTypeDef* hspi) {
   uint8_t address[5] = CONTROLLER_ADDR;
+  com_ack = TRANSMIT_OK;
+  if (tx_semaphore_create(&semaphore, "NRF-semaphore", 1) != TX_SUCCESS) {
+    printf("[RF] failed creating NRF-semaphore\r\n");
+  }
   // Mark all robots as disconnected
   memset(connected_robots, MAX_ROBOT_COUNT, 0);
 
@@ -50,19 +59,25 @@ void COM_Init(SPI_HandleTypeDef* hspi) {
   // Setup for 3 max retries when sending and 500 us between each retry.
   // For motivation, see page 60 in datasheet.
   NRF_WriteRegisterByte(NRF_REG_SETUP_RETR, 0x13);
-
-  /*NRF_EnterMode(NRF_MODE_STANDBY1);
-  for (uint8_t id = 0; id < MAX_ROBOT_COUNT; ++id) {
-      uint8_t addr[5] = ROBOT_PING_ADDR(id);
-      NRF_WriteRegister(NRF_REG_TX_ADDR, addr, 5);
-      NRF_WriteRegister(NRF_REG_RX_ADDR_P0, send_addr, 5);
-      uint8_t msg[] = {'P', 'i', 'n','g'};
-      NRF_Transmit(msg, 4);
-  }*/
+  /*
+  uint8_t addr[5] = ROBOT_ACTION_ADDR(0);
+  NRF_WriteRegister(NRF_REG_TX_ADDR, addr, 5);
+  NRF_WriteRegister(NRF_REG_RX_ADDR_P0, addr, 5);
+  uint8_t msg[] = {'P', 'i', 'n','g'};
+  NRF_Transmit(msg, 4);*/
 
   // Enter receive mode
   NRF_EnterMode(NRF_MODE_RX);
   printf("[RF] Initialized...\r\n");
+}
+
+static uint8_t msg[] = {'P', 'i', 'n', 'g'};
+
+void COM_RF_PingRobots() {
+  uint8_t addr[5] = ROBOT_ACTION_ADDR(0);
+  addr[0] = 0;
+  COM_RF_Transmit(addr, msg, 4);
+  printf("[RF] Ping...\r\n");
 }
 
 void COM_RF_HandleIRQ() {
@@ -71,11 +86,14 @@ void COM_RF_HandleIRQ() {
   if (status & STATUS_MASK_MAX_RT) {
     // Max retries while sending.
     NRF_SetRegisterBit(NRF_REG_STATUS, STATUS_MAX_RT);
+    com_ack = TRANSMIT_FAILED;
   }
+
 
   if (status & STATUS_MASK_TX_DS) {
     // ACK received
     NRF_SetRegisterBit(NRF_REG_STATUS, STATUS_TX_DS);
+    com_ack = TRANSMIT_OK;
   }
 
   if (status & STATUS_MASK_RX_DR) {
@@ -83,6 +101,21 @@ void COM_RF_HandleIRQ() {
     uint8_t pipe = (status & STATUS_MASK_RX_P_NO) >> 1;
     COM_RF_Receive(pipe);
   }
+}
+
+TransmitStatus COM_RF_Transmit(uint8_t* addr, uint8_t* data, uint8_t len) {
+  tx_semaphore_get(&semaphore, TX_WAIT_FOREVER);
+  com_ack = TRANSMIT_ONGOING;
+  NRF_EnterMode(NRF_MODE_STANDBY1);
+  NRF_WriteRegister(NRF_REG_TX_ADDR, addr, 5);
+  NRF_WriteRegister(NRF_REG_RX_ADDR_P0, addr, 5);
+  NRF_Transmit(data, len);
+  while (com_ack == TRANSMIT_ONGOING) {
+    tx_thread_sleep(1);
+  }
+  NRF_EnterMode(NRF_MODE_RX);
+  tx_semaphore_put(&semaphore);
+  return com_ack;
 }
 
 void COM_RF_PrintInfo() {

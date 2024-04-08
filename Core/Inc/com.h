@@ -11,6 +11,9 @@
 #define ROBOT_ACTION_ADDR(id) {1, 255, 255, id, 255}
 #define ROBOT_PING_ADDR(id) {1, 255, 255, id, 0}
 
+typedef enum TransmitStatus {
+    TRANSMIT_OK, TRANSMIT_ONGOING, TRANSMIT_FAILED
+} TransmitStatus;
 /* Public function declarations */
 
 /**
@@ -19,6 +22,9 @@
  * @param hspi The handle for the SPI communication.
  */
 void COM_Init(SPI_HandleTypeDef* hspi);
+
+
+TransmitStatus COM_RF_Transmit(uint8_t* addr, uint8_t* data, uint8_t len);
 
 /**
  * Parse the received message and handle it correctly.
@@ -38,5 +44,10 @@ void COM_RF_HandleIRQ(void);
 void COM_RF_PrintInfo(void);
 
 extern uint8_t connected_robots[MAX_ROBOT_COUNT];
+
+/**
+ * Send a ping message to all robots.
+ */
+void COM_RF_PingRobots();
 
 #endif /* COM_H */

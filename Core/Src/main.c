@@ -138,7 +138,7 @@ int main(void)
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
   printf("\r\n\r\n");
-  COM_Init(&hspi1);
+
   printf("[MAIN] Initialised...\r\n");
   /* USER CODE END 2 */
 

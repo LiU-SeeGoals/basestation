@@ -37,16 +37,12 @@ UINT parse_packet(NX_PACKET* packet, PACKET_TYPE packet_type) {
             ret = NX_INVALID_PACKET;
           } else {
             uint8_t address[5] = ROBOT_ACTION_ADDR(command->robot_id);
-            NRF_EnterMode(NRF_MODE_STANDBY1);
-            NRF_WriteRegister(NRF_REG_TX_ADDR, address, 5);
-            NRF_WriteRegister(NRF_REG_RX_ADDR_P0, address, 5);
-            NRF_Transmit(packet->nx_packet_prepend_ptr, length);
+            COM_RF_Transmit(address, packet->nx_packet_prepend_ptr, length);
             /*for (int i = 0; i < length; ++i) {
                 printf("%u,", packet->nx_packet_prepend_ptr[i]);
             }
             printf("\n");*/
             printf("[NX] RF tx len: %d\r\n", length);
-            NRF_EnterMode(NRF_MODE_RX);
           }
         }
       }
