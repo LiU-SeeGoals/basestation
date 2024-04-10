@@ -92,7 +92,7 @@ void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin) {
       COM_RF_HandleIRQ();
       break;
     default:
-      printf("Unhandled falling interrupt...\r\n");
+      LOG_WARNING("Unhandled falling interrupt...\r\n");
       break;
   }
 }

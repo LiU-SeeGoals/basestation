@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <tx_api.h>
+#include <log.h>
 
 /* Private defines */
 #define PIPE_CONTROLLER 0
@@ -24,18 +25,21 @@
 TX_SEMAPHORE semaphore;
 volatile TransmitStatus com_ack;
 
+static LOG_Module internal_log_mod;
+
 void COM_Init(SPI_HandleTypeDef* hspi) {
+  LOG_InitModule(&internal_log_mod, "RF", LOG_LEVEL_INFO);
   uint8_t address[5] = CONTROLLER_ADDR;
   com_ack = TRANSMIT_OK;
   if (tx_semaphore_create(&semaphore, "NRF-semaphore", 1) != TX_SUCCESS) {
-    printf("[RF] failed creating NRF-semaphore\r\n");
+    LOG_ERROR("Failed creating NRF-semaphore\r\n");
   }
   // Mark all robots as disconnected
   memset(connected_robots, MAX_ROBOT_COUNT, 0);
 
   NRF_Init(hspi, NRF_CSN_GPIO_Port, NRF_CSN_Pin, NRF_CE_GPIO_Port, NRF_CE_Pin);
   if(NRF_VerifySPI() != NRF_OK) {
-    printf("[RF] Couldn't verify nRF24 SPI...\r\n");
+    LOG_WARNING("Couldn't verify nRF24 SPI...\r\n");
   }
 
   // Resets all registers but keeps the device in standby-I mode
@@ -68,7 +72,7 @@ void COM_Init(SPI_HandleTypeDef* hspi) {
 
   // Enter receive mode
   NRF_EnterMode(NRF_MODE_RX);
-  printf("[RF] Initialized...\r\n");
+  LOG_INFO("Initialized...\r\n");
 }
 
 static uint8_t msg[] = {0, 'P', 'i', 'n', 'g'};
@@ -76,7 +80,7 @@ static uint8_t msg[] = {0, 'P', 'i', 'n', 'g'};
 void COM_RF_PingRobots() {
   uint8_t addr[5] = ROBOT_ACTION_ADDR(0);
   COM_RF_Transmit(addr, msg, 5);
-  printf("[RF] Ping...\r\n");
+  LOG_INFO("Requested ping...\r\n");
 }
 
 void COM_RF_HandleIRQ() {
@@ -136,16 +140,16 @@ void COM_RF_Receive(uint8_t pipe) {
   uint8_t payload[len];
   NRF_ReadPayload(payload, len);
 
-  printf("[COM] Payload of length %i on pipe %d\r\n", len, pipe);
+  LOG_INFO("Payload of length %i on pipe %d\r\n", len, pipe);
 
   if (len == 5) {
     uint32_t magic = payload[0] << 24 | (payload[1] << 16) | (payload[2] << 8) | (payload[3]);
     uint8_t id = payload[4];
     if (magic == 0x4df84279 && id < MAX_ROBOT_COUNT) {
     	connected_robots[id] = 1;
-        printf("[COM_RF] Robot %d connected\r\n", id);
+      LOG_INFO("Robot %d connected\r\n", id);
     } else {
-    	printf("[COM_RF] Received invalid packet: 0x%#08x\r\n", magic);
+    	LOG_INFO("Received invalid packet: 0x%#08x\r\n", magic);
     }
   }
 

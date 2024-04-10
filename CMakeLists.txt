@@ -49,11 +49,12 @@ else ()
     add_compile_options(-Og -g)
 endif ()
 
-include_directories(Core/Inc Drivers/STM32H5xx_HAL_Driver/Inc Drivers/STM32H5xx_HAL_Driver/Inc/Legacy Drivers/CMSIS/Device/ST/STM32H5xx/Include Drivers/CMSIS/Include NetXDuo/App AZURE_RTOS/App Middlewares/ST/netxduo/addons/dhcp Middlewares/ST/threadx/common/inc Middlewares/ST/netxduo/common/inc Middlewares/ST/netxduo/ports/cortex_m33/gnu/inc Middlewares/ST/threadx/ports/cortex_m33/gnu/inc NetXDuo/Target Middlewares/ST/netxduo/common/drivers/ethernet Drivers/BSP/Components/lan8742 Libraries/nRF24L01P-lib Libraries/protobuf)
+include_directories(Core/Inc Drivers/STM32H5xx_HAL_Driver/Inc Drivers/STM32H5xx_HAL_Driver/Inc/Legacy Drivers/CMSIS/Device/ST/STM32H5xx/Include Drivers/CMSIS/Include NetXDuo/App AZURE_RTOS/App Middlewares/ST/netxduo/addons/dhcp Middlewares/ST/threadx/common/inc Middlewares/ST/netxduo/common/inc Middlewares/ST/netxduo/ports/cortex_m33/gnu/inc Middlewares/ST/threadx/ports/cortex_m33/gnu/inc NetXDuo/Target Middlewares/ST/netxduo/common/drivers/ethernet Drivers/BSP/Components/lan8742 Libraries/fw-shared-modules/Inc Libraries/nRF24L01P-lib Libraries/proto-messages/proto_c Libraries/protobuf Core/Inc Drivers/STM32H5xx_HAL_Driver/Inc Drivers/STM32H5xx_HAL_Driver/Inc/Legacy Drivers/CMSIS/Device/ST/STM32H5xx/Include Drivers/CMSIS/Include NetXDuo/App AZURE_RTOS/App Middlewares/ST/netxduo/addons/dhcp Middlewares/ST/threadx/common/inc Middlewares/ST/netxduo/common/inc Middlewares/ST/netxduo/ports/cortex_m33/gnu/inc Middlewares/ST/threadx/ports/cortex_m33/gnu/inc NetXDuo/Target Middlewares/ST/netxduo/common/drivers/ethernet Drivers/BSP/Components/lan8742 Libraries/fw-shared-modules/Inc Libraries/nRF24L01P-lib Libraries/proto-messages/proto_c Libraries/protobuf)
 
 add_definitions(-DDEBUG -DUSE_HAL_DRIVER -DSTM32H563xx -DNX_INCLUDE_USER_DEFINE_FILE -DTX_INCLUDE_USER_DEFINE_FILE -DTX_SINGLE_MODE_NON_SECURE=1)
 
-file(GLOB_RECURSE SOURCES "AZURE_RTOS/*.*" "Core/*.*" "Drivers/*.*" "Libraries/nRF24L01P-lib/*.*" "Libraries/protobuf/protobuf-c/*.*" "Middlewares/*.*" "NetXDuo/*.*")
+file(GLOB_RECURSE SOURCES "AZURE_RTOS/*.*" "Core/*.*" "Drivers/*.*" "Libraries/fw-shared-modules/Src/*.*" "Libraries/proto-messages/proto_c/*.*" "Libraries/protobuf/*.*" "Middlewares/*.*" "NetXDuo/*.*")
+file(GLOB NRF_SOURCES "Libraries/nRF24L01P-lib/*.*")
 
 set(LINKER_SCRIPT ${CMAKE_SOURCE_DIR}/STM32H563ZITX_FLASH.ld)
 
@@ -61,7 +62,7 @@ add_link_options(-Wl,-gc-sections,--print-memory-usage,-Map=${PROJECT_BINARY_DIR
 add_link_options(-mcpu=cortex-m33 -mthumb -mthumb-interwork)
 add_link_options(-T ${LINKER_SCRIPT})
 
-add_executable(${PROJECT_NAME}.elf ${SOURCES} ${LINKER_SCRIPT})
+add_executable(${PROJECT_NAME}.elf ${SOURCES} ${NRF_SOURCES} ${LINKER_SCRIPT})
 
 set(HEX_FILE ${PROJECT_BINARY_DIR}/${PROJECT_NAME}.hex)
 set(BIN_FILE ${PROJECT_BINARY_DIR}/${PROJECT_NAME}.bin)

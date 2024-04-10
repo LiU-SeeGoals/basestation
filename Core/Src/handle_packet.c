@@ -1,10 +1,11 @@
 #include "handle_packet.h"
 #include "com.h"
-#include <nrf24l01.h>
 #include <robot_action/robot_action.pb-c.h>
 #include <parsed_vision/parsed_vision.pb-c.h>
+#include <app_netxduo.h>
+#include <log.h>
 
-UINT parse_packet(NX_PACKET* packet, PACKET_TYPE packet_type) {
+UINT parse_packet(NX_PACKET *packet, PACKET_TYPE packet_type) {
   UINT ret = NX_SUCCESS;
 
   switch(packet_type) {
@@ -16,7 +17,7 @@ UINT parse_packet(NX_PACKET* packet, PACKET_TYPE packet_type) {
         if (prased_frame == NULL) {
           ret = NX_INVALID_PACKET;
         } else {
-          printf("[NX] received msg\r\n");
+          LOG_INFO("Received msg\r\n");
 
           free(prased_frame);
         }
@@ -40,11 +41,7 @@ UINT parse_packet(NX_PACKET* packet, PACKET_TYPE packet_type) {
             data[0] = 1;
             memcpy(data + 1, packet->nx_packet_prepend_ptr, length);
             COM_RF_Transmit(address, data, length + 1);
-            /*for (int i = 0; i < length; ++i) {
-                printf("%u,", packet->nx_packet_prepend_ptr[i]);
-            }
-            printf("\n");*/
-            printf("[NX] RF tx len: %d\r\n", length);
+            LOG_INFO("RF tx len: %d\r\n", length);
           }
         }
       }
@@ -52,7 +49,7 @@ UINT parse_packet(NX_PACKET* packet, PACKET_TYPE packet_type) {
   }
 
   if (ret != NX_SUCCESS) {
-    printf("[NX] Failed to parse UDP packet\r\n");
+    LOG_WARNING("Failed to parse UDP packet\r\n");
   }
 
   return ret;

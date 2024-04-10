@@ -26,7 +26,6 @@
 /* USER CODE BEGIN Includes */
 #include "main.h"
 #include <handle_packet.h>
-#include <log.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -51,7 +50,7 @@ NX_IP          NetXDuoEthIpInstance;
 TX_SEMAPHORE   DHCPSemaphore;
 NX_DHCP        DHCPClient;
 /* USER CODE BEGIN PV */
-static LOG_Module   internal_log_mod;
+LOG_Module   internal_log_mod;
 ULONG               IPAddress;
 ULONG               Netmask;
 TX_THREAD           NxUDPThread;
