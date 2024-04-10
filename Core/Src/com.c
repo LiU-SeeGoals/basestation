@@ -3,7 +3,6 @@
 /* Private includes */
 #include <nrf24l01.h>
 #include <nrf_helper_defines.h>
-#include <stdio.h>
 #include <string.h>
 #include <tx_api.h>
 #include <log.h>
@@ -23,6 +22,7 @@
 
 
 TX_SEMAPHORE semaphore;
+// Status of acknowledgement of a transmission
 volatile TransmitStatus com_ack;
 
 static LOG_Module internal_log_mod;
@@ -35,7 +35,9 @@ void COM_Init(SPI_HandleTypeDef* hspi) {
     LOG_ERROR("Failed creating NRF-semaphore\r\n");
   }
   // Mark all robots as disconnected
-  memset(connected_robots, MAX_ROBOT_COUNT, 0);
+  for (int i = 0; i < MAX_ROBOT_COUNT; ++i) {
+    connected_robots[i] = ROBOT_DISCONNECTED;
+  }
 
   NRF_Init(hspi, NRF_CSN_GPIO_Port, NRF_CSN_Pin, NRF_CE_GPIO_Port, NRF_CE_Pin);
   if(NRF_VerifySPI() != NRF_OK) {
@@ -77,10 +79,31 @@ void COM_Init(SPI_HandleTypeDef* hspi) {
 
 static uint8_t msg[] = {0, 'P', 'i', 'n', 'g'};
 
-void COM_RF_PingRobots() {
-  uint8_t addr[5] = ROBOT_ACTION_ADDR(0);
-  COM_RF_Transmit(addr, msg, 5);
-  LOG_INFO("Requested ping...\r\n");
+void COM_RF_PingRobots(bool ping_all) {
+  LOG_INFO("Requesting ping...\r\n");
+  for (int i = 0; i < MAX_ROBOT_COUNT; ++i) {
+    if (!ping_all && connected_robots[i] != ROBOT_CONNECTED) {
+      continue;
+    }
+    connected_robots[i] = ROBOT_PENDING;
+    uint8_t addr[5] = ROBOT_ACTION_ADDR(i);
+    if (COM_RF_Transmit(addr, msg, 5) != TRANSMIT_OK) {
+      LOG_INFO("Robot %d did not respond\r\n", i);
+      continue;
+    }
+    for (int j = 0; j < 50; ++j) {
+      tx_thread_sleep(1);
+      if (connected_robots[i] == ROBOT_CONNECTED) {
+        LOG_INFO("Robot %d responded\r\n", i);
+        goto next;
+      }
+    }
+    // Coming here means ack was received, but the robot still did not respond.
+    LOG_WARNING("Robot %d has disconnected\r\n", i);
+
+    connected_robots[i] = ROBOT_DISCONNECTED;
+    next:;
+  }
 }
 
 void COM_RF_HandleIRQ() {
@@ -122,13 +145,20 @@ TransmitStatus COM_RF_Transmit(uint8_t* addr, uint8_t* data, uint8_t len) {
 }
 
 void COM_RF_PrintInfo() {
+  for (int i = 0; i < MAX_ROBOT_COUNT; ++i) {
+    if (connected_robots[i] != ROBOT_DISCONNECTED) {
+      LOG_INFO("Robot %d connected\r\n", i);
+    } else {
+      LOG_INFO("Robot %d not connected\r\n", i);
+    }
+  }
   NRF_PrintFIFOStatus();
   NRF_PrintStatus();
   NRF_PrintConfig();
 }
 
 
-uint8_t connected_robots[MAX_ROBOT_COUNT];
+volatile RobotConnection connected_robots[MAX_ROBOT_COUNT];
 /*
  * Private function implementations
  */
@@ -146,8 +176,10 @@ void COM_RF_Receive(uint8_t pipe) {
     uint32_t magic = payload[0] << 24 | (payload[1] << 16) | (payload[2] << 8) | (payload[3]);
     uint8_t id = payload[4];
     if (magic == 0x4df84279 && id < MAX_ROBOT_COUNT) {
-    	connected_robots[id] = 1;
-      LOG_INFO("Robot %d connected\r\n", id);
+      if (connected_robots[id] != ROBOT_PENDING) {
+        LOG_INFO("Robot %d connected\r\n", id);
+      }
+      connected_robots[id] = ROBOT_CONNECTED;
     } else {
     	LOG_INFO("Received invalid packet: 0x%#08x\r\n", magic);
     }

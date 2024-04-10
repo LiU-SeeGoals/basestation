@@ -2,6 +2,7 @@
 #define COM_H
 
 /* Public includes */
+#include <stdbool.h>
 #include "main.h"
 
 #define MAX_ROBOT_COUNT 16
@@ -14,6 +15,11 @@
 typedef enum TransmitStatus {
     TRANSMIT_OK, TRANSMIT_ONGOING, TRANSMIT_FAILED
 } TransmitStatus;
+
+typedef enum RobotConnection {
+    ROBOT_CONNECTED, ROBOT_DISCONNECTED, ROBOT_PENDING
+} RobotConnection;
+
 /* Public function declarations */
 
 /**
@@ -43,11 +49,12 @@ void COM_RF_HandleIRQ(void);
  */
 void COM_RF_PrintInfo(void);
 
-extern uint8_t connected_robots[MAX_ROBOT_COUNT];
+extern volatile RobotConnection connected_robots[MAX_ROBOT_COUNT];
 
 /**
- * Send a ping message to all robots.
+ * Send a ping message to robots. If ping_all is false,
+ * only connected robots will be pinged.
  */
-void COM_RF_PingRobots();
+void COM_RF_PingRobots(bool ping_all);
 
 #endif /* COM_H */
