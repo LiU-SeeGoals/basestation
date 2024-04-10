@@ -26,6 +26,7 @@
 /* USER CODE BEGIN Includes */
 #include "main.h"
 #include <handle_packet.h>
+#include <log.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -50,6 +51,7 @@ NX_IP          NetXDuoEthIpInstance;
 TX_SEMAPHORE   DHCPSemaphore;
 NX_DHCP        DHCPClient;
 /* USER CODE BEGIN PV */
+static LOG_Module   internal_log_mod;
 ULONG               IPAddress;
 ULONG               Netmask;
 TX_THREAD           NxUDPThread;
@@ -85,7 +87,7 @@ UINT MX_NetXDuo_Init(VOID *memory_ptr)
   (void)byte_pool;
   /* USER CODE END App_NetXDuo_MEM_POOL */
   /* USER CODE BEGIN 0 */
-
+  LOG_InitModule(&internal_log_mod, "NX", LOG_LEVEL_DEBUG);
   /* USER CODE END 0 */
 
   /* Initialize the NetXDuo system. */
@@ -268,7 +270,7 @@ static VOID ip_address_change_notify_callback(NX_IP *ip_instance, VOID *ptr)
 {
   /* USER CODE BEGIN ip_address_change_notify_callback */
   nx_ip_address_get(ip_instance, &IPAddress, &Netmask);
-  printf("[NX] Got IP: %lu.%lu.%lu.%lu \r\n", (IPAddress >> 24) & 0xff,
+  LOG_INFO("Got IP: %lu.%lu.%lu.%lu \r\n", (IPAddress >> 24) & 0xff,
 										 (IPAddress >> 16) & 0xff,
 										 (IPAddress >> 8) & 0xff,
 										 (IPAddress & 0xff));
@@ -342,7 +344,7 @@ static VOID nx_link_thread_entry(ULONG thread_input)
     if (ret != NX_SUCCESS) {
       if (linkdown != 1) {
         linkdown = 1;
-        printf("[NX] Link down...\r\n");
+        LOG_INFO("Link down...\r\n");
         HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_SET);
         HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
       }
@@ -354,16 +356,16 @@ static VOID nx_link_thread_entry(ULONG thread_input)
     } else {
       if (linkdown == 1) {
         linkdown = 0;
-        printf("[NX] Link up...\r\n");
+        LOG_INFO("Link up...\r\n");
 
         ret = nx_ip_interface_status_check(&NetXDuoEthIpInstance, 0, NX_IP_ADDRESS_RESOLVED, &status, 10);
 
         if (ret == NX_SUCCESS) {
-          printf("[NX] IP resolved...\r\n");
+          LOG_INFO("IP resolved...\r\n");
           HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
           HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_RESET);
         } else {
-          printf("[NX] IP not resolved...\r\n");
+          LOG_INFO("IP not resolved...\r\n");
           HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
           HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_SET);
           nx_ip_driver_direct_command(&NetXDuoEthIpInstance, NX_LINK_ENABLE, &status);
@@ -406,7 +408,7 @@ static VOID nx_udp_thread_entry (ULONG thread_input)
     Error_Handler();
   }
 
-  printf("[NX] Waiting for Proto packets on port %lu...\r\n", VISION_PORT);
+  LOG_INFO("Waiting for Proto packets on port %lu...\r\n", VISION_PORT);
 
   ret = nx_udp_socket_create(&NetXDuoEthIpInstance,
                              &controllerSocket,
@@ -428,7 +430,7 @@ static VOID nx_udp_thread_entry (ULONG thread_input)
   if (ret != NX_SUCCESS) {
     Error_Handler();
   }
-  printf("[NX] Waiting for robot actions on port %lu...\r\n", CONTROLLER_PORT);
+  LOG_INFO("Waiting for robot actions on port %lu...\r\n", CONTROLLER_PORT);
 
   tx_thread_relinquish();
 }
@@ -457,4 +459,5 @@ static VOID udp_socket_receive_controller(NX_UDP_SOCKET *socket_ptr)
   }
 
 }
+
 /* USER CODE END 1 */

@@ -25,6 +25,7 @@
 /* USER CODE BEGIN Includes */
 #include "com.h"
 #include "stdio.h"
+#include <log.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -34,7 +35,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define PUTCHAR_PROTOTYPE int __io_putchar(int ch)
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -55,7 +56,7 @@ SPI_HandleTypeDef hspi1;
 UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN PV */
-
+static LOG_Module internal_log_mod;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -72,6 +73,7 @@ static void MX_SPI1_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
 
 // Printf redirect to uart
 PUTCHAR_PROTOTYPE
@@ -101,6 +103,7 @@ void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin) {
       break;
   }
 }
+
 /* USER CODE END 0 */
 
 /**
@@ -137,9 +140,11 @@ int main(void)
   MX_ICACHE_Init();
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
-  printf("\r\n\r\n");
+  LOG_Init(&huart3);
+  rf_init();
+  LOG_InitModule(&internal_log_mod, "MAIN", LOG_LEVEL_INFO);
+  LOG_INFO("Startup finished...\r\n");
 
-  printf("[MAIN] Initialised...\r\n");
   /* USER CODE END 2 */
 
   MX_ThreadX_Init();
