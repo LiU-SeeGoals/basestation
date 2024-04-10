@@ -1,9 +1,8 @@
 #include "handle_packet.h"
 #include "com.h"
 #include <nrf24l01.h>
-#include <protobuf-c/protobuf-c.h>
-#include <protobuf-c/robot_action.pb-c.h>
-#include <protobuf-c/parsed_vision.pb-c.h>
+#include <robot_action/robot_action.pb-c.h>
+#include <parsed_vision/parsed_vision.pb-c.h>
 
 UINT parse_packet(NX_PACKET* packet, PACKET_TYPE packet_type) {
   UINT ret = NX_SUCCESS;
@@ -31,8 +30,8 @@ UINT parse_packet(NX_PACKET* packet, PACKET_TYPE packet_type) {
         if (length > 31) {
           ret = NX_INVALID_PACKET;
         } else {
-          Action__Command* command = NULL;
-          command = action__command__unpack(NULL, length, packet->nx_packet_prepend_ptr);
+          Command* command = NULL;
+          command = command__unpack(NULL, length, packet->nx_packet_prepend_ptr);
           if (command == NULL) {
             ret = NX_INVALID_PACKET;
           } else {

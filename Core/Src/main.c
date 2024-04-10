@@ -75,20 +75,13 @@ static void MX_SPI1_Init(void);
 /* USER CODE BEGIN 0 */
 
 
-// Printf redirect to uart
-PUTCHAR_PROTOTYPE
-{
-  HAL_UART_Transmit(&huart3, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
-  return ch;
-}
-
 void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin) {
   switch (GPIO_Pin) {
     case BTN_USER_Pin:
       COM_RF_PrintInfo();
       break;
     default:
-      printf("Unhandled rising interrupt...\r\n");
+      LOG_ERROR("Unhandled rising interrupt...\r\n");
       break;
   }
 }
@@ -141,7 +134,6 @@ int main(void)
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
   LOG_Init(&huart3);
-  rf_init();
   LOG_InitModule(&internal_log_mod, "MAIN", LOG_LEVEL_INFO);
   LOG_INFO("Startup finished...\r\n");
 
