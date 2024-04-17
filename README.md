@@ -15,6 +15,15 @@ There are two compiling options used, `Debug` is used to compile the project, `C
 
 By running the project through STM32CubeIDE and having the NUCLEO card connected through USB (st-link marked port) the binary is flashed to the MCU.
 
+The project can also be compiled using cmake. 
+mkdir build
+cmake -B build . -DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE
+cd build && make
+
+Flashing can be done outside of STM32CubeIDE using STM32_Programmer_CLI. It is bundled with STM32CubeIDE on windows, and is available at [STM32CubeCLT](https://www.st.com/en/development-tools/stm32cubeclt.html)
+STM32_Programmer_CLI -c port=SWD sn=004C00283232511639353236 ap=1 -w build\basestation.bin 0x08000000 -rst
+
+
 # Documentation
 
 ## Sheets
