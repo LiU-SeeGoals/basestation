@@ -4,6 +4,10 @@ This is the firmware for the basestation (NUCLEO-H563ZI) which parses messages f
 ## Contributing
 Make sure to follow the [firmware standard](https://github.com/LiU-SeeGoals/wiki/wiki/1.-Processes-&-Standards#seegoal---firmware-standard) and the [feature branch](https://github.com/LiU-SeeGoals/wiki/wiki/1.-Processes-&-Standards#feature-branch-integration) concept.
 
+## Git Submodules 
+This project uses several Git Submodules. To get all Submodules at the correct version, use git update --init --recursive.
+This has to be done the first time you clone, and everytime you change branch to a branch with different submodule versions.
+
 ## Building and flashing
 This project has to be compiled and flashed through the STM32CubeIDE.
 
