@@ -23,7 +23,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include <nrf24l01.h>
+#include "com.h"
+#include "stdio.h"
 #include <log.h>
 /* USER CODE END Includes */
 
@@ -67,11 +68,34 @@ static void MX_USART3_UART_Init(void);
 static void MX_ICACHE_Init(void);
 static void MX_SPI1_Init(void);
 /* USER CODE BEGIN PFP */
-void rf_init(void);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+
+void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin) {
+  switch (GPIO_Pin) {
+    case BTN_USER_Pin:
+      COM_RF_PrintInfo();
+      break;
+    default:
+      LOG_ERROR("Unhandled rising interrupt...\r\n");
+      break;
+  }
+}
+
+void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin) {
+  switch (GPIO_Pin) {
+    case NRF_IRQ_Pin:
+      COM_RF_HandleIRQ();
+      break;
+    default:
+      LOG_WARNING("Unhandled falling interrupt...\r\n");
+      break;
+  }
+}
 
 /* USER CODE END 0 */
 
@@ -110,9 +134,9 @@ int main(void)
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
   LOG_Init(&huart3);
-  rf_init();
   LOG_InitModule(&internal_log_mod, "MAIN", LOG_LEVEL_INFO);
   LOG_INFO("Startup finished...\r\n");
+
   /* USER CODE END 2 */
 
   MX_ThreadX_Init();
@@ -462,83 +486,7 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin) {
-  switch (GPIO_Pin) {
-    case BTN_USER_Pin:
-      NRF_PrintStatus();
-      NRF_PrintFIFOStatus();
-      break;
-    default:
-      LOG_ERROR("Unhandled rising interrupt...\r\n");
-      break;
-  }
-}
 
-void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin) {
-  switch (GPIO_Pin) {
-    case NRF_IRQ_Pin:
-      {
-        uint8_t status = NRF_ReadStatus();
-        if (status & (1<<4)) {
-          // Reset MAX_RT in status register.
-          NRF_SetRegisterBit(NRF_REG_STATUS, 4);
-        }
-
-        if (status & (1<<5)) {
-          // TX_DS is set in status register.
-          // This means we've gotten an ACK from the receiver
-          // and the message was thus succesfully received.
-          NRF_SetRegisterBit(NRF_REG_STATUS, 5); // Reset TX_DS
-        }
-
-        if (status & (1<<6)) {
-          // RX_DR
-          uint8_t length = 0x00;
-          NRF_SendReadCommand(NRF_CMD_R_RX_PL_WID, &length, 1);
-          uint8_t payload[length];
-          NRF_ReadPayload(payload, length);
-          //for (int i = 0; i < length; i++) {
-          //}
-          NRF_SetRegisterBit(NRF_REG_STATUS, 6); // Reset RX_DR
-        }
-      }
-      break;
-    default:
-      LOG_ERROR("Unhandled falling interrupt...\r\n");
-      break;
-  }
-}
-
-void rf_init(void) {
-  uint8_t address[5] = {1,2,3,4,5};
-
-  NRF_Init(&hspi1, NRF_CSN_GPIO_Port, NRF_CSN_Pin, NRF_CE_GPIO_Port, NRF_CE_Pin);
-  if(NRF_VerifySPI() != NRF_OK) {
-    LOG_ERROR("Couldn't verify nRF24...\r\n");
-  }
-
-  // Resets all registers but keeps the device in standby-I mode
-  NRF_Reset();
-
-  // Set the RF channel frequency, it's defined as: 2400 + NRF_REG_RF_CH [MHz]
-  NRF_WriteRegisterByte(NRF_REG_RF_CH, 0x0F);
-
-  // Setup the TX address.
-  // We also have to set pipe 0 to receive on the same address.
-  NRF_WriteRegister(NRF_REG_TX_ADDR, address, 5);
-  NRF_WriteRegister(NRF_REG_RX_ADDR_P0, address, 5);
-
-  /* To enable ACK payloads we need to setup dynamic payload length. */
-
-  // Enables us to send custom payload with ACKs.
-  NRF_SetRegisterBit(NRF_REG_FEATURE, 1);
-
-  // Enables dynamic payload length generally.
-  NRF_SetRegisterBit(NRF_REG_FEATURE, 2);
-
-  // Enables dynamic payload on pipe 0.
-  NRF_SetRegisterBit(NRF_REG_DYNPD, 0);
-}
 /* USER CODE END 4 */
 
 /**

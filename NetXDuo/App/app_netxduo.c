@@ -25,12 +25,7 @@
 #include "nxd_dhcp_client.h"
 /* USER CODE BEGIN Includes */
 #include "main.h"
-#include <nrf24l01.h>
-#include <pb_encode.h>
-#include <pb_decode.h>
-#include <ssl_wrapper.pb.h>
-#include <robot_action.pb.h>
-#include <log.h>
+#include <handle_packet.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -55,7 +50,7 @@ NX_IP          NetXDuoEthIpInstance;
 TX_SEMAPHORE   DHCPSemaphore;
 NX_DHCP        DHCPClient;
 /* USER CODE BEGIN PV */
-static LOG_Module   internal_log_mod;
+LOG_Module   internal_log_mod;
 ULONG               IPAddress;
 ULONG               Netmask;
 TX_THREAD           NxUDPThread;
@@ -75,7 +70,6 @@ static VOID nx_link_thread_entry(ULONG thread_input);
 static VOID nx_udp_thread_entry(ULONG thread_input);
 static VOID udp_socket_receive_vision(NX_UDP_SOCKET *socket_ptr);
 static VOID udp_socket_receive_controller(NX_UDP_SOCKET *socket_ptr);
-static UINT parse_packet(NX_PACKET* packet, int packet_type);
 /* USER CODE END PFP */
 
 /**
@@ -221,12 +215,6 @@ UINT MX_NetXDuo_Init(VOID *memory_ptr)
 
   /* USER CODE BEGIN MX_NetXDuo_Init */
 
-  // Enable IGMP so we can subscribe to multicast groups
-  ret = nx_igmp_enable(&NetXDuoEthIpInstance);
-  if (ret != NX_SUCCESS) {
-    return NX_NOT_SUCCESSFUL;
-  }
-
   // Create the link thread
   if (tx_byte_allocate(byte_pool, (VOID **) &pointer, NX_APP_THREAD_STACK_SIZE, TX_NO_WAIT) != TX_SUCCESS)
   {
@@ -341,6 +329,8 @@ static VOID nx_app_thread_entry (ULONG thread_input)
 }
 
 /* USER CODE BEGIN 1 */
+
+
 static VOID nx_link_thread_entry(ULONG thread_input)
 {
   ULONG status;
@@ -441,13 +431,6 @@ static VOID nx_udp_thread_entry (ULONG thread_input)
   }
   LOG_INFO("Waiting for robot actions on port %lu...\r\n", CONTROLLER_PORT);
 
-  ret = nx_igmp_multicast_join(&NetXDuoEthIpInstance, IP_ADDRESS(224,5,23,2));
-  if (ret != NX_SUCCESS) {
-    LOG_INFO("Failed joining multicast group: %u\r\n", ret);
-  } else {
-    LOG_INFO("Joined multicast group 224.5.23.2\r\n");
-  }
-
   tx_thread_relinquish();
 }
 
@@ -476,42 +459,4 @@ static VOID udp_socket_receive_controller(NX_UDP_SOCKET *socket_ptr)
 
 }
 
-static UINT parse_packet(NX_PACKET* packet, int packet_type) {
-  UINT ret = NX_SUCCESS;
-
-  switch(packet_type) {
-    case SSL_WRAPPER:
-      {
-        SSL_WrapperPacket proto_packet;
-        int length = packet->nx_packet_append_ptr - packet->nx_packet_prepend_ptr;
-        pb_istream_t stream = pb_istream_from_buffer(packet->nx_packet_prepend_ptr, length);
-        bool status = pb_decode(&stream, action_Command_fields, &proto_packet);
-        if (!status) {
-          ret = NX_INVALID_PACKET;
-        } else {
-          LOG_DEBUG("received msg\r\n");
-        }
-        // TODO: we need to extract the interesting data that is supposed
-        // to be sent to each robot, then queue them up and send them
-      }
-      break;
-    case ROBOT_COMMAND:
-      {
-        int length = packet->nx_packet_append_ptr - packet->nx_packet_prepend_ptr;
-        if (length > 32) {
-          ret = NX_INVALID_PACKET;
-        } else {
-          NRF_Transmit(packet->nx_packet_prepend_ptr, length);
-          LOG_DEBUG("tx len: %d\r\n", length);
-        }
-      }
-      break;
-  }
-
-  if (ret != NX_SUCCESS) {
-    LOG_ERROR("Failed to parse UDP packet\r\n");
-  }
-
-  return ret;
-}
 /* USER CODE END 1 */
