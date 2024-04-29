@@ -139,6 +139,11 @@ TransmitStatus COM_RF_Transmit(uint8_t* addr, uint8_t* data, uint8_t len) {
   while (com_ack == TRANSMIT_ONGOING) {
     tx_thread_sleep(1);
   }
+  if (com_ack != TRANSMIT_OK) {
+    // Flush tx buffer
+    NRF_SendCommand(NRF_CMD_FLUSH_TX);
+  }
+
   NRF_EnterMode(NRF_MODE_RX);
   tx_semaphore_put(&semaphore);
   return com_ack;
