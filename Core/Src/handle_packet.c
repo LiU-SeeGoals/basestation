@@ -36,12 +36,17 @@ UINT parse_packet(NX_PACKET *packet, PACKET_TYPE packet_type) {
           if (command == NULL) {
             ret = NX_INVALID_PACKET;
           } else {
-            uint8_t address[5] = ROBOT_ACTION_ADDR(command->robot_id);
             uint8_t data[32];
             data[0] = 1;
             memcpy(data + 1, packet->nx_packet_prepend_ptr, length);
-            COM_RF_Transmit(address, data, length + 1);
-            LOG_INFO("RF tx len: %d\r\n", length);
+            TransmitStatus status;
+            if ((status = COM_RF_Transmit(command->robot_id, data, length + 1)) != TRANSMIT_OK) {
+              LOG_INFO("Transmit failed: %d\r\n", status);
+            }
+            protobuf_c_message_free_unpacked(command, NULL);
+            static int count = 0;
+            LOG_INFO("RF tx len: %d, %d\r\n", length, count);
+            ++count;
           }
         }
       }

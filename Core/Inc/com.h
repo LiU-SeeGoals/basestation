@@ -27,10 +27,18 @@ typedef enum RobotConnection {
  *
  * @param hspi The handle for the SPI communication.
  */
-void COM_Init(SPI_HandleTypeDef* hspi);
+void COM_RF_Init(SPI_HandleTypeDef* hspi);
 
-
-TransmitStatus COM_RF_Transmit(uint8_t* addr, uint8_t* data, uint8_t len);
+/**
+ * Transmit a data buffer to a robot.
+ * The first data byte should be id < 16
+ *
+ * @param robot id of destination robot.
+ * @param data data to send, data[0] = id
+ * @param len length of data, <= 32
+ * @return
+ */
+TransmitStatus COM_RF_Transmit(uint8_t robot, uint8_t* data, uint8_t len);
 
 /**
  * Parse the received message and handle it correctly.
