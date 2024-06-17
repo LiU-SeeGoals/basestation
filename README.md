@@ -4,12 +4,25 @@ This is the firmware for the basestation (NUCLEO-H563ZI) which parses messages f
 ## Contributing
 Make sure to follow the [firmware standard](https://github.com/LiU-SeeGoals/wiki/wiki/1.-Processes-&-Standards#seegoal---firmware-standard) and the [feature branch](https://github.com/LiU-SeeGoals/wiki/wiki/1.-Processes-&-Standards#feature-branch-integration) concept.
 
+## Git Submodules 
+This project uses several Git Submodules. To get all Submodules at the correct version, use git update --init --recursive.
+This has to be done the first time you clone, and everytime you change branch to a branch with different submodule versions.
+
 ## Building and flashing
 This project has to be compiled and flashed through the STM32CubeIDE.
 
 There are two compiling options used, `Debug` is used to compile the project, `Compiledb` uses [compiledb](https://github.com/nickdiego/compiledb) to produce a `compile_commands.json` file which can be used with your LSP powered IDE of choice.
 
 By running the project through STM32CubeIDE and having the NUCLEO card connected through USB (st-link marked port) the binary is flashed to the MCU.
+
+The project can also be compiled using cmake:  
+`mkdir build`  
+`cmake -B build . -DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE`  
+`cd build && make`  
+
+Flashing can be done outside of STM32CubeIDE using STM32_Programmer_CLI. It is bundled with STM32CubeIDE on windows, and is available at [STM32CubeCLT](https://www.st.com/en/development-tools/stm32cubeclt.html).  
+`STM32_Programmer_CLI -c port=SWD sn=004C00283232511639353236 ap=1 -w build\basestation.bin 0x08000000 -rst`
+
 
 # Documentation
 

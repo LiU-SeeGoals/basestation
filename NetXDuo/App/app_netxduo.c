@@ -25,11 +25,7 @@
 #include "nxd_dhcp_client.h"
 /* USER CODE BEGIN Includes */
 #include "main.h"
-#include <nrf24l01.h>
-#include <pb_encode.h>
-#include <pb_decode.h>
-#include <ssl_wrapper.pb.h>
-#include <robot_action.pb.h>
+#include <handle_packet.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -54,6 +50,7 @@ NX_IP          NetXDuoEthIpInstance;
 TX_SEMAPHORE   DHCPSemaphore;
 NX_DHCP        DHCPClient;
 /* USER CODE BEGIN PV */
+LOG_Module   internal_log_mod;
 ULONG               IPAddress;
 ULONG               Netmask;
 TX_THREAD           NxUDPThread;
@@ -73,7 +70,6 @@ static VOID nx_link_thread_entry(ULONG thread_input);
 static VOID nx_udp_thread_entry(ULONG thread_input);
 static VOID udp_socket_receive_vision(NX_UDP_SOCKET *socket_ptr);
 static VOID udp_socket_receive_controller(NX_UDP_SOCKET *socket_ptr);
-static UINT parse_packet(NX_PACKET* packet, int packet_type);
 /* USER CODE END PFP */
 
 /**
@@ -90,7 +86,7 @@ UINT MX_NetXDuo_Init(VOID *memory_ptr)
   (void)byte_pool;
   /* USER CODE END App_NetXDuo_MEM_POOL */
   /* USER CODE BEGIN 0 */
-
+  LOG_InitModule(&internal_log_mod, "NX", LOG_LEVEL_DEBUG);
   /* USER CODE END 0 */
 
   /* Initialize the NetXDuo system. */
@@ -219,12 +215,6 @@ UINT MX_NetXDuo_Init(VOID *memory_ptr)
 
   /* USER CODE BEGIN MX_NetXDuo_Init */
 
-  // Enable IGMP so we can subscribe to multicast groups
-  ret = nx_igmp_enable(&NetXDuoEthIpInstance);
-  if (ret != NX_SUCCESS) {
-    return NX_NOT_SUCCESSFUL;
-  }
-
   // Create the link thread
   if (tx_byte_allocate(byte_pool, (VOID **) &pointer, NX_APP_THREAD_STACK_SIZE, TX_NO_WAIT) != TX_SUCCESS)
   {
@@ -279,7 +269,7 @@ static VOID ip_address_change_notify_callback(NX_IP *ip_instance, VOID *ptr)
 {
   /* USER CODE BEGIN ip_address_change_notify_callback */
   nx_ip_address_get(ip_instance, &IPAddress, &Netmask);
-  printf("[NX] Got IP: %lu.%lu.%lu.%lu \r\n", (IPAddress >> 24) & 0xff,
+  LOG_INFO("Got IP: %lu.%lu.%lu.%lu \r\n", (IPAddress >> 24) & 0xff,
 										 (IPAddress >> 16) & 0xff,
 										 (IPAddress >> 8) & 0xff,
 										 (IPAddress & 0xff));
@@ -339,6 +329,8 @@ static VOID nx_app_thread_entry (ULONG thread_input)
 }
 
 /* USER CODE BEGIN 1 */
+
+
 static VOID nx_link_thread_entry(ULONG thread_input)
 {
   ULONG status;
@@ -351,7 +343,7 @@ static VOID nx_link_thread_entry(ULONG thread_input)
     if (ret != NX_SUCCESS) {
       if (linkdown != 1) {
         linkdown = 1;
-        printf("[NX] Link down...\r\n");
+        LOG_INFO("Link down...\r\n");
         HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_SET);
         HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
       }
@@ -363,16 +355,16 @@ static VOID nx_link_thread_entry(ULONG thread_input)
     } else {
       if (linkdown == 1) {
         linkdown = 0;
-        printf("[NX] Link up...\r\n");
+        LOG_INFO("Link up...\r\n");
 
         ret = nx_ip_interface_status_check(&NetXDuoEthIpInstance, 0, NX_IP_ADDRESS_RESOLVED, &status, 10);
 
         if (ret == NX_SUCCESS) {
-          printf("[NX] IP resolved...\r\n");
+          LOG_INFO("IP resolved...\r\n");
           HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
           HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_RESET);
         } else {
-          printf("[NX] IP not resolved...\r\n");
+          LOG_INFO("IP not resolved...\r\n");
           HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
           HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_SET);
           nx_ip_driver_direct_command(&NetXDuoEthIpInstance, NX_LINK_ENABLE, &status);
@@ -415,7 +407,7 @@ static VOID nx_udp_thread_entry (ULONG thread_input)
     Error_Handler();
   }
 
-  printf("[NX] Waiting for Proto packets on port %lu...\r\n", VISION_PORT);
+  LOG_INFO("Waiting for Proto packets on port %lu...\r\n", VISION_PORT);
 
   ret = nx_udp_socket_create(&NetXDuoEthIpInstance,
                              &controllerSocket,
@@ -437,14 +429,7 @@ static VOID nx_udp_thread_entry (ULONG thread_input)
   if (ret != NX_SUCCESS) {
     Error_Handler();
   }
-  printf("[NX] Waiting for robot actions on port %lu...\r\n", CONTROLLER_PORT);
-
-  ret = nx_igmp_multicast_join(&NetXDuoEthIpInstance, IP_ADDRESS(224,5,23,2));
-  if (ret != NX_SUCCESS) {
-    printf("[NX] Failed joining multicast group: %u\r\n", ret);
-  } else {
-    printf("[NX] Joined multicast group 224.5.23.2\r\n");
-  }
+  LOG_INFO("Waiting for robot actions on port %lu...\r\n", CONTROLLER_PORT);
 
   tx_thread_relinquish();
 }
@@ -474,42 +459,4 @@ static VOID udp_socket_receive_controller(NX_UDP_SOCKET *socket_ptr)
 
 }
 
-static UINT parse_packet(NX_PACKET* packet, int packet_type) {
-  UINT ret = NX_SUCCESS;
-
-  switch(packet_type) {
-    case SSL_WRAPPER:
-      {
-        SSL_WrapperPacket proto_packet;
-        int length = packet->nx_packet_append_ptr - packet->nx_packet_prepend_ptr;
-        pb_istream_t stream = pb_istream_from_buffer(packet->nx_packet_prepend_ptr, length);
-        bool status = pb_decode(&stream, action_Command_fields, &proto_packet);
-        if (!status) {
-          ret = NX_INVALID_PACKET;
-        } else {
-          printf("[NX] received msg\r\n");
-        }
-        // TODO: we need to extract the interesting data that is supposed
-        // to be sent to each robot, then queue them up and send them
-      }
-      break;
-    case ROBOT_COMMAND:
-      {
-        int length = packet->nx_packet_append_ptr - packet->nx_packet_prepend_ptr;
-        if (length > 32) {
-          ret = NX_INVALID_PACKET;
-        } else {
-          NRF_Transmit(packet->nx_packet_prepend_ptr, length);
-          printf("[RF] tx len: %d\r\n", length);
-        }
-      }
-      break;
-  }
-
-  if (ret != NX_SUCCESS) {
-    printf("[NX] Failed to parse UDP packet\r\n");
-  }
-
-  return ret;
-}
 /* USER CODE END 1 */
