@@ -314,11 +314,12 @@ static VOID nx_app_thread_entry (ULONG thread_input)
     /* USER CODE END DHCP client start error */
   }
 
+
   /* wait until an IP address is ready */
   if(tx_semaphore_get(&DHCPSemaphore, NX_APP_DEFAULT_TIMEOUT) != TX_SUCCESS)
   {
     /* USER CODE BEGIN DHCPSemaphore get error */
-    Error_Handler();
+    while (tx_semaphore_get(&DHCPSemaphore, NX_APP_DEFAULT_TIMEOUT) != TX_SUCCESS) {}
     /* USER CODE END DHCPSemaphore get error */
   }
 
