@@ -3,7 +3,6 @@
 /* Private includes */
 #include <nrf24l01.h>
 #include <nrf_helper_defines.h>
-#include <string.h>
 #include <tx_api.h>
 #include <log.h>
 
