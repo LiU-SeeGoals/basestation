@@ -1,3 +1,2 @@
 - [ ] My code follows the [style guidelines](https://github.com/LiU-SeeGoals/wiki/wiki/1.1.-Processes-&-Standards#seegoal---firmware-standard) of this project
-- [ ] Any changed pins has been updated [here](https://docs.google.com/spreadsheets/d/1YuhNjBIbEAqgfZ5klig0hVEmeGSEhsgrR7WvW7-10Q0/edit#gid=0).
 - [ ] I've set an responsible reviewer and pinged this person on Discord.

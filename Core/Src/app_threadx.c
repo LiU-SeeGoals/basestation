@@ -99,7 +99,7 @@ void MX_ThreadX_Init(void)
 
 /* USER CODE BEGIN 1 */
 static VOID tx_app_thread_entry (ULONG thread_input) {
-  COM_Init(&hspi1);
+  COM_RF_Init(&hspi1);
   COM_RF_PingRobots(true);
 
 }
