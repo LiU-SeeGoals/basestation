@@ -29,7 +29,7 @@ static LOG_Module internal_log_mod;
 uint8_t msg_order[MAX_ROBOT_COUNT];
 
 void COM_RF_Init(SPI_HandleTypeDef* hspi) {
-  LOG_InitModule(&internal_log_mod, "RF", LOG_LEVEL_INFO);
+  LOG_InitModule(&internal_log_mod, "RF", LOG_LEVEL_TRACE);
   uint8_t address[5] = CONTROLLER_ADDR;
   com_ack = TRANSMIT_OK;
   if (tx_semaphore_create(&semaphore, "NRF-semaphore", 1) != TX_SUCCESS) {
