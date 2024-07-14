@@ -9,17 +9,24 @@ This project uses several Git Submodules. To get all Submodules at the correct v
 This has to be done the first time you clone, and everytime you change branch to a branch with different submodule versions.
 
 ## Building and flashing
-The project can also be compiled using cmake:  
+This is a cmake project.
+
+To be able to build, make sure you've the `gcc-arm-none-eabi` compiler installed.
+
+Then build with:  
 ```
-mkdir build
-cmake -B build
-cd build && make
+cmake -B build && make -C build
 ```
 
-Flashing can be done outside of STM32CubeIDE using STM32_Programmer_CLI ([download here](https://www.st.com/en/development-tools/stm32cubeprog.html)).  
-`STM32_Programmer_CLI -c port=SWD sn=004C00283232511639353236 ap=1 -w build\basestation.bin 0x08000000 -rst`
+To flash, you can use the `STM32_Programmer_CLI` program downloadable from [here](https://www.st.com/en/development-tools/stm32cubeprog.html).
+```
+STM32_Programmer_CLI -c port=SWD sn=004C00283232511639353236 -w build/basestation.bin 0x08000000 -rst
+```
 
-Or through the make rule `make flash`.
+There's also a build rule in make:  
+```
+make flash -C build
+```
 
 ### Soon to be deprecated
 This project can also be compiled/debugged through STM32CubeIDE.
