@@ -1,2 +1,3 @@
 - [ ] My code follows the [style guidelines](https://github.com/LiU-SeeGoals/wiki/wiki/1.1.-Processes-&-Standards#seegoal---firmware-standard) of this project
+- [ ] I've compared the local **basestation.ioc** with main branches .ioc and made sure no pin's has been relocated.
 - [ ] I've set an responsible reviewer and pinged this person on Discord.
