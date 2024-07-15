@@ -147,9 +147,9 @@ TransmitStatus COM_RF_Transmit(uint8_t robot, uint8_t* data, uint8_t len) {
   NRF_EnterMode(NRF_MODE_STANDBY1);
   NRF_WriteRegister(NRF_REG_TX_ADDR, addr, 5);
   NRF_WriteRegister(NRF_REG_RX_ADDR_P0, addr, 5);
-  int retires = 3;
+  int retries = 3;
   NRF_Transmit(data, len);
-  while (retires > 0) {
+  while (retries > 0) {
     for (int i = 0; i < 100 && com_ack == TRANSMIT_ONGOING; ++i) {
       tx_thread_sleep(1);
     }
@@ -158,7 +158,7 @@ TransmitStatus COM_RF_Transmit(uint8_t robot, uint8_t* data, uint8_t len) {
     }
     com_ack = TRANSMIT_ONGOING;
     NRF_ReTransmit();
-    --retires;
+    --retries;
   }
 
   if (com_ack != TRANSMIT_OK) {
