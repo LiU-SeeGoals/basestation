@@ -53,7 +53,52 @@ include_directories(Core/Inc Drivers/STM32H5xx_HAL_Driver/Inc Drivers/STM32H5xx_
 
 add_definitions(-DDEBUG -DUSE_HAL_DRIVER -DSTM32H563xx -DNX_INCLUDE_USER_DEFINE_FILE -DTX_INCLUDE_USER_DEFINE_FILE -DTX_SINGLE_MODE_NON_SECURE=1)
 
-file(GLOB_RECURSE SOURCES "AZURE_RTOS/*.*" "Core/*.*" "Drivers/*.*" "Libraries/fw-shared-modules/Src/*.*" "Libraries/proto-messages/proto_c/*.*" "Libraries/protobuf/*.*" "Middlewares/*.*" "NetXDuo/*.*")
+set(CORE_SRC
+    Core/Src/app_threadx.c
+    Core/Src/com.c
+    Core/Src/handle_packet.c
+    Core/Src/main.c
+    Core/Src/stm32h5xx_hal_msp.c
+    Core/Src/stm32h5xx_hal_timebase_tim.c
+    Core/Src/stm32h5xx_it.c
+    Core/Src/syscalls.c
+    Core/Src/sysmem.c
+    Core/Src/system_stm32h5xx.c
+    Core/Src/tx_initialize_low_level.S
+    Core/Startup/startup_stm32h563zitx.s
+)
+set(CORE_INC
+    Core/Inc/app_threadx.h
+    Core/Inc/com.h
+    Core/Inc/handle_packet.h
+    Core/Inc/main.h
+    Core/Inc/stm32h5xx_hal_conf.h
+    Core/Inc/stm32h5xx_it.h
+    Core/Inc/tx_user.h
+)
+set(SHARED_MODULES_SRC
+    Libraries/fw-shared-modules/Src/log.c)
+set(SHARED_MODULES_INC
+    Libraries/fw-shared-modules/Inc/log.h
+    Libraries/fw-shared-modules/Inc/ringbuffer.h
+)
+set(PROTO_SRC
+    Libraries/protobuf/protobuf-c/protobuf-c.c
+    Libraries/proto-messages/proto_c/parsed_vision/parsed_vision.pb-c.c
+    Libraries/proto-messages/proto_c/robot_action/robot_action.pb-c.c
+)
+set(PROTO_INC
+    Libraries/protobuf/protobuf-c/protobuf-c.h
+    Libraries/proto-messages/proto_c/parsed_vision/parsed_vision.pb-c.h
+    Libraries/proto-messages/proto_c/robot_action/robot_action.pb-c.h
+)
+set(NRF_SRC 
+    Libraries/nRF24L01P-lib/nrf24l01.c)
+set(NRF_INC
+    Libraries/nRF24L01P-lib/nrf24l01.h
+    Libraries/nRF24L01P-lib/nrf_helper_defines.h)
+
+file(GLOB_RECURSE STM32_SOURCES "Drivers/*.*" "Middlewares/*.*" "NetXDuo/*.*" "AZURE_RTOS/*.*")
 file(GLOB NRF_SOURCES "Libraries/nRF24L01P-lib/*.*")
 
 set(LINKER_SCRIPT ${CMAKE_SOURCE_DIR}/STM32H563ZITX_FLASH.ld)
@@ -62,7 +107,13 @@ add_link_options(-Wl,-gc-sections,--print-memory-usage,-Map=${PROJECT_BINARY_DIR
 add_link_options(-mcpu=cortex-m33 -mthumb -mthumb-interwork)
 add_link_options(-T ${LINKER_SCRIPT})
 
-add_executable(${PROJECT_NAME}.elf ${SOURCES} ${NRF_SOURCES} ${LINKER_SCRIPT})
+add_executable(${PROJECT_NAME}.elf ${NRF_SOURCES} ${LINKER_SCRIPT} 
+               ${CORE_SRC} ${CORE_INC}
+               ${SHARED_MODULES_SRC} ${SHARED_MODULES_INC}
+               ${PROTO_SRC} ${PROTO_INC}
+               ${NRF_SRC} ${NRF_INC}
+               ${STM32_SOURCES}
+               ${DRIVER_SRC} ${DRIVER_INC})
 
 set(HEX_FILE ${PROJECT_BINARY_DIR}/${PROJECT_NAME}.hex)
 set(BIN_FILE ${PROJECT_BINARY_DIR}/${PROJECT_NAME}.bin)
