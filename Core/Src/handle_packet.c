@@ -11,15 +11,16 @@ UINT parse_packet(NX_PACKET *packet, PACKET_TYPE packet_type) {
   switch (packet_type) {
   case SSL_WRAPPER: {
     int length = packet->nx_packet_append_ptr - packet->nx_packet_prepend_ptr;
-    ParsedFrame *prased_frame = NULL;
-    prased_frame =
+    ParsedFrame *parsed_frame = NULL;
+    parsed_frame =
         parsed_frame__unpack(NULL, length, packet->nx_packet_prepend_ptr);
-    if (prased_frame == NULL) {
+    if (parsed_frame == NULL) {
+      LOG_INFO("Protobuf parse failed\r\n");
       ret = NX_INVALID_PACKET;
     } else {
       LOG_INFO("Received msg\r\n");
 
-      free(prased_frame);
+      free(parsed_frame);
     }
     // TODO: we need to extract the interesting data that is supposed
     // to be sent to each robot, then queue them up and send them
