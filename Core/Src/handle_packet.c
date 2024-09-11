@@ -18,7 +18,11 @@ UINT parse_packet(NX_PACKET *packet, PACKET_TYPE packet_type) {
       LOG_INFO("Protobuf parse failed\r\n");
       ret = NX_INVALID_PACKET;
     } else {
-      LOG_INFO("Received msg\r\n");
+      int ball_x, ball_y, robot_count;
+      ball_x = parsed_frame->ball->pos->x;
+      ball_y = parsed_frame->ball->pos->x;
+      robot_count = parsed_frame->n_robots;
+      LOG_INFO("Received msg: Ball (%d, %d), Robots: %d\r\n", ball_x, ball_y, robot_count);
 
       free(parsed_frame);
     }
@@ -36,7 +40,7 @@ UINT parse_packet(NX_PACKET *packet, PACKET_TYPE packet_type) {
         ret = NX_INVALID_PACKET;
       } else {
         uint8_t data[32];
-        data[0] = 1;
+        data[0] = MESSAGE_ID_COMMAND;
         memcpy(data + 1, packet->nx_packet_prepend_ptr, length);
         TransmitStatus status;
         if ((status = COM_RF_Transmit(command->robot_id, data, length + 1)) !=

@@ -4,13 +4,7 @@
 /* Public includes */
 #include <stdbool.h>
 #include "main.h"
-
-#define MAX_ROBOT_COUNT 16
-
-#define CONTROLLER_ADDR {2, 255, 255, 255, 255}
-#define ROBOT_DATA_ADDR(id) {1, 255, 255, id, 128}
-#define ROBOT_ACTION_ADDR(id) {1, 255, 255, id, 255}
-#define ROBOT_PING_ADDR(id) {1, 255, 255, id, 0}
+#include <radio.h>
 
 typedef enum TransmitStatus {
     TRANSMIT_OK, TRANSMIT_ONGOING, TRANSMIT_FAILED
@@ -31,14 +25,24 @@ void COM_RF_Init(SPI_HandleTypeDef* hspi);
 
 /**
  * Transmit a data buffer to a robot.
- * The first data byte should be id < 16
+ * The first data byte should be msg id < 16.
  *
  * @param robot id of destination robot.
- * @param data data to send, data[0] = id
+ * @param data data to send, data[0] = msg id
  * @param len length of data, <= 32
- * @return
+ * @return status
  */
 TransmitStatus COM_RF_Transmit(uint8_t robot, uint8_t* data, uint8_t len);
+
+/**
+ * Broadcast a data buffer to all robots.
+ * The first data byte should be msg id.
+ *
+ * @param data data to send, data [0] = msg id
+ * @param len length of data, <= 32
+ * @return status
+ */
+TransmitStatus COM_RF_Broadcast(uint8_t* data, uint8_t len);
 
 /**
  * Parse the received message and handle it correctly.

@@ -7,10 +7,6 @@
 #include <log.h>
 
 /* Private defines */
-#define PIPE_CONTROLLER 0
-#define PIPE_VISION     1
-
-#define CONNECT_MAGIC 0x4d, 0xf8, 0x42, 0x79
 
 /* Private functions declarations */
 //...
@@ -54,7 +50,7 @@ void COM_RF_Init(SPI_HandleTypeDef* hspi) {
 
   // Setup the TX address.
   // We also have to set pipe 0 to receive on the same address.
-  uint8_t send_addr[5] = ROBOT_ACTION_ADDR(0);
+  uint8_t send_addr[5] = ROBOT_ADDR(ROBOT_ID_BROADCAST);
 
   NRF_WriteRegister(NRF_REG_TX_ADDR, send_addr, 5);
   NRF_WriteRegister(NRF_REG_RX_ADDR_P0, send_addr, 5);
@@ -63,6 +59,7 @@ void COM_RF_Init(SPI_HandleTypeDef* hspi) {
   // We enable ACK payloads which needs dynamic payload to function.
   NRF_SetRegisterBit(NRF_REG_FEATURE, FEATURE_EN_ACK_PAY);
   NRF_SetRegisterBit(NRF_REG_FEATURE, FEATURE_EN_DPL);
+  NRF_SetRegisterBit(NRF_REG_FEATURE, FEATURE_EN_DYN_ACK);
   NRF_WriteRegisterByte(NRF_REG_DYNPD, 0x03);
   // Setup for 3 max retries when sending and 500 us between each retry.
   // For motivation, see page 60 in datasheet.
@@ -79,7 +76,7 @@ void COM_RF_Init(SPI_HandleTypeDef* hspi) {
   LOG_INFO("Initialized...\r\n");
 }
 
-static uint8_t msg[] = {0, 'P', 'i', 'n', 'g'};
+static uint8_t ping_msg[] = {MESSAGE_ID_PING, 'P', 'i', 'n', 'g'};
 
 void COM_RF_PingRobots(bool ping_all) {
   LOG_INFO("Requesting ping...\r\n");
@@ -93,7 +90,7 @@ void COM_RF_PingRobots(bool ping_all) {
     // happens to match the last value the robot knows.
     for (int k = 0; k < 2 ; ++k) {
       connected_robots[i] = ROBOT_PENDING;
-      if (COM_RF_Transmit(i, msg, 5) != TRANSMIT_OK) {
+      if (COM_RF_Transmit(i, ping_msg, 5) != TRANSMIT_OK) {
         LOG_INFO("Robot %d did not respond\r\n", i);
         connected_robots[i] = ROBOT_DISCONNECTED;
         goto next;
@@ -126,7 +123,7 @@ void COM_RF_HandleIRQ() {
 
 
   if (status & STATUS_MASK_TX_DS) {
-    // ACK received
+    // ACK received (or no ack is used)
     NRF_SetRegisterBit(NRF_REG_STATUS, STATUS_TX_DS);
     com_ack = TRANSMIT_OK;
   }
@@ -139,7 +136,7 @@ void COM_RF_HandleIRQ() {
 }
 
 TransmitStatus COM_RF_Transmit(uint8_t robot, uint8_t* data, uint8_t len) {
-  uint8_t addr[5] = ROBOT_ACTION_ADDR(robot);
+  uint8_t addr[5] = ROBOT_ADDR(robot);
   tx_semaphore_get(&semaphore, TX_WAIT_FOREVER);
   com_ack = TRANSMIT_ONGOING;
   data[0] |= msg_order[robot];
@@ -171,6 +168,26 @@ TransmitStatus COM_RF_Transmit(uint8_t robot, uint8_t* data, uint8_t len) {
   return com_ack;
 }
 
+TransmitStatus COM_RF_Broadcast(uint8_t *data, uint8_t len) {
+  uint8_t addr[5] = ROBOT_ADDR(ROBOT_ID_BROADCAST);
+  tx_semaphore_get(&semaphore, TX_WAIT_FOREVER);
+
+  com_ack = TRANSMIT_ONGOING;
+  NRF_EnterMode(NRF_MODE_STANDBY1);
+  NRF_WriteRegister(NRF_REG_TX_ADDR, addr, 5);
+  NRF_WriteRegister(NRF_REG_RX_ADDR_P0, addr, 5);
+  NRF_TransmitNoAck(data, len);
+  for (int i = 0; i < 100 && com_ack == TRANSMIT_ONGOING; ++i) {
+    tx_thread_sleep(1);
+  }
+
+  NRF_EnterMode(NRF_MODE_RX);
+  tx_semaphore_put(&semaphore);
+
+  return com_ack;
+}
+
+
 void COM_RF_PrintInfo() {
   for (int i = 0; i < MAX_ROBOT_COUNT; ++i) {
     if (connected_robots[i] != ROBOT_DISCONNECTED) {
@@ -200,9 +217,9 @@ void COM_RF_Receive(uint8_t pipe) {
   LOG_INFO("Payload of length %i on pipe %d\r\n", len, pipe);
 
   if (len == 5) {
-    uint32_t magic = payload[0] << 24 | (payload[1] << 16) | (payload[2] << 8) | (payload[3]);
+    uint32_t magic = CONNECT_MAGIC_READ(payload);
     uint8_t id = payload[4];
-    if (magic == 0x4df84279 && id < MAX_ROBOT_COUNT) {
+    if (magic == CONNECT_MAGIC && id < MAX_ROBOT_COUNT) {
       if (connected_robots[id] != ROBOT_PENDING) {
         LOG_INFO("Robot %d connected\r\n", id);
       }
