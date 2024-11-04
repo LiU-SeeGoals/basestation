@@ -19,6 +19,9 @@
 TX_SEMAPHORE semaphore;
 // Status of acknowledgement of a transmission
 volatile TransmitStatus com_ack;
+// Ack payload
+volatile uint8_t ackpayload_len;
+volatile uint8_t ackpayload[16];
 
 static LOG_Module internal_log_mod;
 
@@ -125,7 +128,9 @@ void COM_RF_HandleIRQ() {
   if (status & STATUS_MASK_TX_DS) {
     // ACK received (or no ack is used)
     NRF_SetRegisterBit(NRF_REG_STATUS, STATUS_TX_DS);
-    com_ack = TRANSMIT_OK;
+    if (com_ack == TRANSMIT_ONGOING) {
+      com_ack = TRANSMIT_OK;
+    }
   }
 
   if (status & STATUS_MASK_RX_DR) {
@@ -144,23 +149,53 @@ TransmitStatus COM_RF_Transmit(uint8_t robot, uint8_t* data, uint8_t len) {
   NRF_EnterMode(NRF_MODE_STANDBY1);
   NRF_WriteRegister(NRF_REG_TX_ADDR, addr, 5);
   NRF_WriteRegister(NRF_REG_RX_ADDR_P0, addr, 5);
-  int retries = 3;
   NRF_Transmit(data, len);
-  while (retries > 0) {
-    for (int i = 0; i < 100 && com_ack == TRANSMIT_ONGOING; ++i) {
-      tx_thread_sleep(1);
-    }
-    if (com_ack != TRANSMIT_FAILED) {
+
+  uint32_t now = HAL_GetTick();
+  while (com_ack == TRANSMIT_ONGOING) {
+    if (HAL_GetTick() - now > 3) {
       break;
     }
-    com_ack = TRANSMIT_ONGOING;
-    NRF_ReTransmit();
-    --retries;
   }
 
   if (com_ack != TRANSMIT_OK) {
     // Flush tx buffer
     NRF_SendCommand(NRF_CMD_FLUSH_TX);
+  }
+
+  NRF_EnterMode(NRF_MODE_RX);
+  tx_semaphore_put(&semaphore);
+  return com_ack;
+}
+
+TransmitStatus COM_RF_TransmitWithResponse(uint8_t robot, uint8_t *data,
+                                           uint8_t len, uint8_t *rx_buf,
+                                           uint8_t* rx_len) {
+  uint8_t addr[5] = ROBOT_ADDR(robot);
+  tx_semaphore_get(&semaphore, TX_WAIT_FOREVER);
+  com_ack = TRANSMIT_RESPONSE_PENDING;
+  data[0] |= msg_order[robot];
+  msg_order[robot] += 16;
+  NRF_EnterMode(NRF_MODE_STANDBY1);
+  NRF_WriteRegister(NRF_REG_TX_ADDR, addr, 5);
+  NRF_WriteRegister(NRF_REG_RX_ADDR_P0, addr, 5);
+  NRF_Transmit(data, len);
+
+  uint32_t now = HAL_GetTick();
+  while (com_ack == TRANSMIT_RESPONSE_PENDING) {
+    if (HAL_GetTick() - now > 3) {
+      break;
+    }
+  }
+
+  if (com_ack != TRANSMIT_OK) {
+    // Flush tx buffer
+    NRF_SendCommand(NRF_CMD_FLUSH_TX);
+  } else {
+    *rx_len = ackpayload_len;
+    for (int i = 0; i < *rx_len; ++i) {
+      rx_buf[i] = ackpayload[i];
+    }
   }
 
   NRF_EnterMode(NRF_MODE_RX);
@@ -177,11 +212,16 @@ TransmitStatus COM_RF_Broadcast(uint8_t *data, uint8_t len) {
   NRF_WriteRegister(NRF_REG_TX_ADDR, addr, 5);
   NRF_WriteRegister(NRF_REG_RX_ADDR_P0, addr, 5);
   NRF_TransmitNoAck(data, len);
-  for (int i = 0; i < 100 && com_ack == TRANSMIT_ONGOING; ++i) {
-    tx_thread_sleep(1);
+
+  uint32_t now = HAL_GetTick();
+  while (com_ack == TRANSMIT_ONGOING) {
+    if (HAL_GetTick() - now > 3) {
+      break;
+    }
   }
 
   NRF_EnterMode(NRF_MODE_RX);
+
   tx_semaphore_put(&semaphore);
 
   return com_ack;
@@ -213,10 +253,11 @@ void COM_RF_Receive(uint8_t pipe) {
 
   uint8_t payload[len];
   NRF_ReadPayload(payload, len);
+  NRF_SetRegisterBit(NRF_REG_STATUS, STATUS_RX_DR);
 
   LOG_INFO("Payload of length %i on pipe %d\r\n", len, pipe);
-
   if (len == 5) {
+    // Ping can happen spontaneously, event when waiting for response.
     uint32_t magic = CONNECT_MAGIC_READ(payload);
     uint8_t id = payload[4];
     if (magic == CONNECT_MAGIC && id < MAX_ROBOT_COUNT) {
@@ -224,10 +265,21 @@ void COM_RF_Receive(uint8_t pipe) {
         LOG_INFO("Robot %d connected\r\n", id);
       }
       connected_robots[id] = ROBOT_CONNECTED;
-    } else {
-    	LOG_INFO("Received invalid packet: 0x%#08x\r\n", magic);
+      return;
     }
   }
 
-  NRF_SetRegisterBit(NRF_REG_STATUS, 6);
+  if (com_ack == TRANSMIT_RESPONSE_PENDING) {
+    com_ack = TRANSMIT_OK;
+    if (len < 16) {
+      for (int i = 0; i < len; ++i) {
+        ackpayload[i] = payload[i];
+      }
+      ackpayload_len = len;
+    } else {
+      // TRANSMIT_OK since transmit whent well.
+      // Caller has to handle that no valid payload was received.
+      ackpayload_len = 0;
+    }
+  }
 }

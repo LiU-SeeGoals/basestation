@@ -2,16 +2,21 @@
 #define COM_H
 
 /* Public includes */
-#include <stdbool.h>
 #include "main.h"
 #include <radio.h>
+#include <stdbool.h>
 
 typedef enum TransmitStatus {
-    TRANSMIT_OK, TRANSMIT_ONGOING, TRANSMIT_FAILED
+  TRANSMIT_OK,
+  TRANSMIT_ONGOING,
+  TRANSMIT_RESPONSE_PENDING,
+  TRANSMIT_FAILED
 } TransmitStatus;
 
 typedef enum RobotConnection {
-    ROBOT_CONNECTED, ROBOT_DISCONNECTED, ROBOT_PENDING
+  ROBOT_CONNECTED,
+  ROBOT_DISCONNECTED,
+  ROBOT_PENDING
 } RobotConnection;
 
 /* Public function declarations */
@@ -21,7 +26,7 @@ typedef enum RobotConnection {
  *
  * @param hspi The handle for the SPI communication.
  */
-void COM_RF_Init(SPI_HandleTypeDef* hspi);
+void COM_RF_Init(SPI_HandleTypeDef *hspi);
 
 /**
  * Transmit a data buffer to a robot.
@@ -32,7 +37,23 @@ void COM_RF_Init(SPI_HandleTypeDef* hspi);
  * @param len length of data, <= 32
  * @return status
  */
-TransmitStatus COM_RF_Transmit(uint8_t robot, uint8_t* data, uint8_t len);
+TransmitStatus COM_RF_Transmit(uint8_t robot, uint8_t *data, uint8_t len);
+
+/**
+ * Transmit a data buffer to a robot.
+ * The first data byte should be msg id < 16.
+ * Receives a payload back from the robot.
+ *
+ * @param robot id of destination robot.
+ * @param data data to send, data[0] = msg id
+ * @param len length of data, <= 32
+ * @param ackpayload buffer >= 16 bytes that receives ack payload.
+ * @param acklen receives ack payload length
+ * @return status
+ */
+TransmitStatus COM_RF_TransmitWithResponse(uint8_t robot, uint8_t *data,
+                                           uint8_t len, uint8_t *rx_buf,
+                                           uint8_t* rx_len);
 
 /**
  * Broadcast a data buffer to all robots.
@@ -42,7 +63,7 @@ TransmitStatus COM_RF_Transmit(uint8_t robot, uint8_t* data, uint8_t len);
  * @param len length of data, <= 32
  * @return status
  */
-TransmitStatus COM_RF_Broadcast(uint8_t* data, uint8_t len);
+TransmitStatus COM_RF_Broadcast(uint8_t *data, uint8_t len);
 
 /**
  * Parse the received message and handle it correctly.

@@ -442,7 +442,9 @@ static VOID udp_socket_receive_vision(NX_UDP_SOCKET *socket_ptr)
 
   ret = nx_udp_socket_receive(socket_ptr, &data_packet, NX_APP_DEFAULT_TIMEOUT);
   if (ret == NX_SUCCESS) {
-    parse_packet(data_packet, SSL_WRAPPER);
+    uint16_t length = data_packet->nx_packet_append_ptr - 
+                      data_packet->nx_packet_prepend_ptr;
+    parse_packet(data_packet->nx_packet_prepend_ptr, length, SSL_WRAPPER);
     nx_packet_release(data_packet);
   }
 }
@@ -454,7 +456,9 @@ static VOID udp_socket_receive_controller(NX_UDP_SOCKET *socket_ptr)
 
   ret = nx_udp_socket_receive(socket_ptr, &data_packet, NX_APP_DEFAULT_TIMEOUT);
   if (ret == NX_SUCCESS) {
-    parse_packet(data_packet, ROBOT_COMMAND);
+    uint16_t length = data_packet->nx_packet_append_ptr - 
+                      data_packet->nx_packet_prepend_ptr;
+    parse_packet(data_packet->nx_packet_prepend_ptr, length, ROBOT_COMMAND);
     nx_packet_release(data_packet);
   }
 
