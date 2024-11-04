@@ -1,10 +1,12 @@
 import subprocess
 import socket
+import serial
 import struct
 import pathlib
 import sys
-import os
 import shutil
+import time
+import argparse
 
 ROOT = (pathlib.Path(__file__).parent / "..").resolve()
 
@@ -25,7 +27,7 @@ EXE = ROOT / "tests" / f"message{EXE_EXT}"
 BUILD_DIR = ROOT / "tests" / "build"
 
 MSVC = {"exe": "cl.exe", "inc": "/I{}", "out": "/Fe:{}", "flags": ["/nologo", f"/Fo:{BUILD_DIR}/"]}
-GCC = {"exe": f"gcc{EXE_EXT}", "inc": "-I{}", "out": "-o{}", "flags": []}
+GCC = {"exe": f"gcc{EXE_EXT}", "inc": "-I{}", "out": "-o{}", "flags": ["-g"]}
 CLANG = {"exe": "clang{EXE_EXT}", "inc" : "-I{}", "out": "-o{}", "flags": []}
 
 if sys.platform == "win32":
@@ -39,7 +41,13 @@ else:
 
 def compile_c():
     if EXE.exists():
-        return
+        last_mod = 0.0
+        for file in SOURCE:
+            m = pathlib.Path(file).lstat().st_mtime
+            if m > last_mod:
+                last_mod = m
+        if EXE.lstat().st_mtime > last_mod:
+            return
     BUILD_DIR.mkdir(exist_ok=True)
     for comp in COMPILERS:
         exe = shutil.which(comp['exe'])
@@ -57,22 +65,64 @@ def compile_c():
     raise RuntimeError("Could not find compiler")
 
 
+class Writer:
+    def __init__(self, con: str) -> None:
+        parts = con.split(':', 1)
+        if len(parts) == 1:
+            self._dev = serial.Serial(con, 115200)
+            self.write = self._serial
+        else:
+            self.write = self._udp
+            self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self._addr = ((parts[0], int(parts[1])))
+
+
+    def _udp(self, msg: bytes) -> None:
+        self._socket.sendto(msg, self._addr)
+
+    def _serial(self, msg: bytes) -> None:
+        data = struct.pack('<H', len(msg) + 1) + b'\x00' + msg
+        time.sleep(1)
+        self._dev.write(data)
+
 def main():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("-n", action="store", default=1, type=int)
+    parser.add_argument("-d", action="store", default=20, type=int)
+    parser.add_argument('--con', action="store", default="192.168.0.100:10020")
+
+    args = parser.parse_args()
+
     compile_c()
-    return
-    data = subprocess.run(['test.exe'], stdout=subprocess.PIPE)
+
+    data = subprocess.run([str(EXE)], stdout=subprocess.PIPE)
     raw = data.stdout.decode('utf-8')
     bts = raw.split(',')
 
     var = [int(b) for b in bts if b]
-    print(var)
     data = struct.pack('B' * len(var), *var)
-    print(data, len(data))
+    
+    writer = Writer(args.con)
 
+    delay = float(args.d) / 1000
 
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    print(f"Sending {len(var)} bytes")
 
-    sock.sendto(data, ('192.168.0.100', 10020))
+    stamp = time.time()
+
+    try:
+        while True:
+            if writer._dev.in_waiting > 0:
+                out = writer._dev.read(writer._dev.in_waiting)
+                s = out.decode('ascii')
+                print(s, end="")
+            if time.time() - stamp > 1.0:
+                print(f"---Writing {len(data)} msg")
+                writer.write(data)
+            time.sleep(0.1)
+    except KeyboardInterrupt:
+        pass
 
 if __name__ == "__main__":
     main()

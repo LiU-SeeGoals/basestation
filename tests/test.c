@@ -18,6 +18,7 @@ void print_frame(int ball_px, int ball_py, int ball_vx, int ball_vy, size_t robo
   ball.vel = &vel;
   frame.ball = &ball;
   Robot robots[16];
+  Robot* rob[16];
   for (int i = 0; i < robot_count; ++i) {
     robot__init(&robots[i]);
     robots[i].robot_id = i;
@@ -32,10 +33,10 @@ void print_frame(int ball_px, int ball_py, int ball_vx, int ball_vy, size_t robo
     robots[i].vel->y = 15 - i;
     robots[i].pos->x = 5;
     robots[i].pos->y = 2 * i;
+    rob[i] = &robots[i];
   }
   frame.n_robots = robot_count;
-  Robot* rob = robots;
-  frame.robots = &rob;
+  frame.robots = rob;
   uint8_t buf[256];
   size_t size = parsed_frame__pack(&frame, buf);
 
@@ -46,6 +47,6 @@ void print_frame(int ball_px, int ball_py, int ball_vx, int ball_vy, size_t robo
 }
 
 int main() {
-  print_frame(0, 0, 0, 0, 1);
+  print_frame(123, -456, 0, 0, 2);
   return 0;
 }
