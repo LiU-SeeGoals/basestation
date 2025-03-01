@@ -9,24 +9,19 @@
 /* Private defines */
 #define PIPE_CONTROLLER 0
 #define PIPE_VISION     1
+#define CONNECT_MAGIC   0x4d, 0xf8, 0x42, 0x79
 
-#define CONNECT_MAGIC 0x4d, 0xf8, 0x42, 0x79
+/* Private variables */
+volatile RobotConnection connected_robots[MAX_ROBOT_COUNT];
+TX_SEMAPHORE semaphore;
+volatile TransmitStatus com_ack; // Status of acknowledgement of a transmission
+static LOG_Module internal_log_mod;
+uint8_t msg_order[MAX_ROBOT_COUNT];
 
-/* Private functions declarations */
-//...
 
 /*
  * Public functions implementations
  */
-
-
-TX_SEMAPHORE semaphore;
-// Status of acknowledgement of a transmission
-volatile TransmitStatus com_ack;
-
-static LOG_Module internal_log_mod;
-
-uint8_t msg_order[MAX_ROBOT_COUNT];
 
 void COM_RF_Init(SPI_HandleTypeDef* hspi) {
   LOG_InitModule(&internal_log_mod, "RF", LOG_LEVEL_TRACE);
@@ -64,15 +59,10 @@ void COM_RF_Init(SPI_HandleTypeDef* hspi) {
   NRF_SetRegisterBit(NRF_REG_FEATURE, FEATURE_EN_ACK_PAY);
   NRF_SetRegisterBit(NRF_REG_FEATURE, FEATURE_EN_DPL);
   NRF_WriteRegisterByte(NRF_REG_DYNPD, 0x03);
+
   // Setup for 3 max retries when sending and 500 us between each retry.
   // For motivation, see page 60 in datasheet.
   NRF_WriteRegisterByte(NRF_REG_SETUP_RETR, 0x13);
-  /*
-  uint8_t addr[5] = ROBOT_ACTION_ADDR(0);
-  NRF_WriteRegister(NRF_REG_TX_ADDR, addr, 5);
-  NRF_WriteRegister(NRF_REG_RX_ADDR_P0, addr, 5);
-  uint8_t msg[] = {'P', 'i', 'n','g'};
-  NRF_Transmit(msg, 4);*/
 
   // Enter receive mode
   NRF_EnterMode(NRF_MODE_RX);
@@ -184,12 +174,6 @@ void COM_RF_PrintInfo() {
   NRF_PrintConfig();
 }
 
-
-volatile RobotConnection connected_robots[MAX_ROBOT_COUNT];
-/*
- * Private function implementations
- */
-
 void COM_RF_Receive(uint8_t pipe) {
   uint8_t len = 0;
   NRF_SendReadCommand(NRF_CMD_R_RX_PL_WID, &len, 1);
@@ -198,6 +182,11 @@ void COM_RF_Receive(uint8_t pipe) {
   NRF_ReadPayload(payload, len);
 
   LOG_INFO("Payload of length %i on pipe %d\r\n", len, pipe);
+
+  if (len > 2 && payload[0] == 0x57 && payload[1] == 0x75) {
+    // We received a LOG_BASESTATION(...)
+    LOG_INFO("ROBOT %d: %s\r\n", payload[2], payload + 3);
+  }
 
   if (len == 5) {
     uint32_t magic = payload[0] << 24 | (payload[1] << 16) | (payload[2] << 8) | (payload[3]);
@@ -208,7 +197,7 @@ void COM_RF_Receive(uint8_t pipe) {
       }
       connected_robots[id] = ROBOT_CONNECTED;
     } else {
-    	LOG_INFO("Received invalid packet: 0x%#08x\r\n", magic);
+      LOG_INFO("Received invalid packet: 0x%#08x\r\n", magic);
     }
   }
 
