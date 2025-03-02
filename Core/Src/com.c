@@ -202,6 +202,7 @@ void COM_RF_Receive(uint8_t pipe) {
   if (len == 5) {
     uint32_t magic = payload[0] << 24 | (payload[1] << 16) | (payload[2] << 8) | (payload[3]);
     uint8_t id = payload[4];
+
     if (magic == 0x4df84279 && id < MAX_ROBOT_COUNT) {
       if (connected_robots[id] != ROBOT_PENDING) {
         LOG_INFO("Robot %d connected\r\n", id);
