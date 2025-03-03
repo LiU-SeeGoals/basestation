@@ -5,6 +5,9 @@
 #include <parsed_vision/parsed_vision.pb-c.h>
 #include <robot_action/robot_action.pb-c.h>
 
+#define MAX_NO_RESPONSES 5
+uint8_t no_robot_responses[MAX_ROBOT_COUNT];
+
 UINT parse_packet(NX_PACKET *packet, PACKET_TYPE packet_type) {
   UINT ret = NX_SUCCESS;
 
@@ -12,8 +15,7 @@ UINT parse_packet(NX_PACKET *packet, PACKET_TYPE packet_type) {
   case SSL_WRAPPER: {
     int length = packet->nx_packet_append_ptr - packet->nx_packet_prepend_ptr;
     ParsedFrame *prased_frame = NULL;
-    prased_frame =
-        parsed_frame__unpack(NULL, length, packet->nx_packet_prepend_ptr);
+    prased_frame = parsed_frame__unpack(NULL, length, packet->nx_packet_prepend_ptr);
     if (prased_frame == NULL) {
       ret = NX_INVALID_PACKET;
     } else {
@@ -26,27 +28,43 @@ UINT parse_packet(NX_PACKET *packet, PACKET_TYPE packet_type) {
   } break;
   case ROBOT_COMMAND: {
     int length = packet->nx_packet_append_ptr - packet->nx_packet_prepend_ptr;
+
     if (length > 31) {
       ret = NX_INVALID_PACKET;
     } else {
       Command *command = NULL;
       command = command__unpack(NULL, length, packet->nx_packet_prepend_ptr);
+
       if (command == NULL) {
         ret = NX_INVALID_PACKET;
+        LOG_ERROR("Invalid packet!\r\n");
       } else {
-        uint8_t data[32];
-        data[0] = 1;
-        memcpy(data + 1, packet->nx_packet_prepend_ptr, length);
-        TransmitStatus status;
-        if ((status = COM_RF_Transmit(command->robot_id, data, length + 1)) !=
-            TRANSMIT_OK) {
-          LOG_INFO("Transmit failed: %d\r\n", status);
+        const ProtobufCEnumValue* enum_value = protobuf_c_enum_descriptor_get_value(&action_type__descriptor, command->command_id);
+
+        if (connected_robots[command->robot_id] == ROBOT_CONNECTED) {
+          uint8_t data[32];
+          data[0] = 1;
+          memcpy(data + 1, packet->nx_packet_prepend_ptr, length);
+          TransmitStatus status = COM_RF_Transmit(command->robot_id, data, length + 1);
+          if (status != TRANSMIT_OK) {
+            LOG_INFO("Failed sending robot #%d command %s\r\n", command->robot_id, enum_value->name);
+            no_robot_responses[command->robot_id]++;
+
+            if (no_robot_responses[command->robot_id] > MAX_NO_RESPONSES) {
+              connected_robots[command->robot_id] = ROBOT_DISCONNECTED;
+              no_robot_responses[command->robot_id] = 0;
+              LOG_INFO("Disconnected robot #%d after %d TX attempts\r\n", command->robot_id, MAX_NO_RESPONSES+1);
+            }
+          } else {
+            no_robot_responses[command->robot_id] = 0;
+            LOG_INFO("Successfully sent robot #%d command %s\r\n", command->robot_id, enum_value->name);
+          }
+        } else {
+          LOG_INFO("Robot #%d is disconnected, can't send %s\r\n", command->robot_id, enum_value->name);
         }
-        protobuf_c_message_free_unpacked(&command->base, NULL);
-        static int count = 0;
-        LOG_INFO("RF tx len: %d, %d\r\n", length, count);
-        ++count;
       }
+
+      protobuf_c_message_free_unpacked(&command->base, NULL);
     }
   } break;
   }
