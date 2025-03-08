@@ -86,7 +86,7 @@ UINT MX_NetXDuo_Init(VOID *memory_ptr)
   (void)byte_pool;
   /* USER CODE END App_NetXDuo_MEM_POOL */
   /* USER CODE BEGIN 0 */
-  LOG_InitModule(&internal_log_mod, "NX", LOG_LEVEL_DEBUG);
+  LOG_InitModule(&internal_log_mod, "NX", LOG_LEVEL_DEBUG, 0);
   /* USER CODE END 0 */
 
   /* Initialize the NetXDuo system. */
