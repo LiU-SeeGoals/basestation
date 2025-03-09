@@ -25,7 +25,8 @@
 #include "nxd_dhcp_client.h"
 /* USER CODE BEGIN Includes */
 #include "main.h"
-#include <handle_packet.h>
+#include <log.h>
+#include <com.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -50,7 +51,7 @@ NX_IP          NetXDuoEthIpInstance;
 TX_SEMAPHORE   DHCPSemaphore;
 NX_DHCP        DHCPClient;
 /* USER CODE BEGIN PV */
-LOG_Module   internal_log_mod;
+static LOG_Module   internal_log_mod;
 ULONG               IPAddress;
 ULONG               Netmask;
 TX_THREAD           NxUDPThread;
@@ -442,7 +443,7 @@ static VOID udp_socket_receive_vision(NX_UDP_SOCKET *socket_ptr)
 
   ret = nx_udp_socket_receive(socket_ptr, &data_packet, NX_APP_DEFAULT_TIMEOUT);
   if (ret == NX_SUCCESS) {
-    parse_packet(data_packet, SSL_WRAPPER);
+    COM_ParsePacket(data_packet, SSL_WRAPPER);
     nx_packet_release(data_packet);
   }
 }
@@ -454,7 +455,7 @@ static VOID udp_socket_receive_controller(NX_UDP_SOCKET *socket_ptr)
 
   ret = nx_udp_socket_receive(socket_ptr, &data_packet, NX_APP_DEFAULT_TIMEOUT);
   if (ret == NX_SUCCESS) {
-    parse_packet(data_packet, ROBOT_COMMAND);
+    COM_ParsePacket(data_packet, ROBOT_COMMAND);
     nx_packet_release(data_packet);
   }
 
