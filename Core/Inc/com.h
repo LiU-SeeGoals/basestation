@@ -2,15 +2,15 @@
 #define COM_H
 
 /* Public includes */
-#include <stdbool.h>
 #include "main.h"
+#include <stdbool.h>
+#include <app_netxduo.h>
+#include <nx_api.h>
 
-#define MAX_ROBOT_COUNT 16
-
-#define CONTROLLER_ADDR {2, 255, 255, 255, 255}
-#define ROBOT_DATA_ADDR(id) {1, 255, 255, id, 128}
+#define CONTROLLER_ADDR       {2, 255, 255, 255, 255}
+#define ROBOT_DATA_ADDR(id)   {1, 255, 255, id, 128}
 #define ROBOT_ACTION_ADDR(id) {1, 255, 255, id, 255}
-#define ROBOT_PING_ADDR(id) {1, 255, 255, id, 0}
+#define ROBOT_PING_ADDR(id)   {1, 255, 255, id, 0}
 
 typedef enum TransmitStatus {
     TRANSMIT_OK, TRANSMIT_ONGOING, TRANSMIT_FAILED
@@ -19,6 +19,9 @@ typedef enum TransmitStatus {
 typedef enum RobotConnection {
     ROBOT_CONNECTED, ROBOT_DISCONNECTED, ROBOT_PENDING
 } RobotConnection;
+
+enum _PACKET_TYPE {SSL_WRAPPER, ROBOT_COMMAND};
+typedef enum _PACKET_TYPE PACKET_TYPE;
 
 /* Public function declarations */
 
@@ -57,12 +60,14 @@ void COM_RF_HandleIRQ(void);
  */
 void COM_RF_PrintInfo(void);
 
-extern volatile RobotConnection connected_robots[MAX_ROBOT_COUNT];
-
 /**
  * Send a ping message to robots. If ping_all is false,
  * only connected robots will be pinged.
  */
 void COM_RF_PingRobots(bool ping_all);
+
+uint8_t* COM_CreateDummyPacket(uint8_t robot_id, uint8_t* len);
+
+UINT COM_ParsePacket(NX_PACKET *packet, PACKET_TYPE packet_type);
 
 #endif /* COM_H */

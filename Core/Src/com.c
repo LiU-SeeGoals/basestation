@@ -1,17 +1,20 @@
-#include "com.h"
-
 /* Private includes */
+#include "com.h"
 #include <nrf24l01.h>
 #include <nrf_helper_defines.h>
-#include <tx_api.h>
 #include <log.h>
+#include <protobuf-c/protobuf-c.h>
+#include <robot_action/robot_action.pb-c.h>
+#include <parsed_vision/parsed_vision.pb-c.h>
 
 /* Private defines */
 #define PIPE_CONTROLLER 0
 #define PIPE_VISION     1
 #define CONNECT_MAGIC   0x4d, 0xf8, 0x42, 0x79
+#define MAX_NO_RESPONSES 20
 
 /* Private variables */
+uint8_t no_robot_responses[MAX_ROBOT_COUNT];
 volatile RobotConnection connected_robots[MAX_ROBOT_COUNT];
 TX_SEMAPHORE semaphore;
 volatile TransmitStatus com_ack; // Status of acknowledgement of a transmission
@@ -30,6 +33,7 @@ void COM_RF_Init(SPI_HandleTypeDef* hspi) {
   if (tx_semaphore_create(&semaphore, "NRF-semaphore", 1) != TX_SUCCESS) {
     LOG_ERROR("Failed creating NRF-semaphore\r\n");
   }
+
   // Mark all robots as disconnected
   for (int i = 0; i < MAX_ROBOT_COUNT; ++i) {
     connected_robots[i] = ROBOT_DISCONNECTED;
@@ -140,9 +144,9 @@ TransmitStatus COM_RF_Transmit(uint8_t robot, uint8_t* data, uint8_t len) {
   NRF_EnterMode(NRF_MODE_STANDBY1);
   NRF_WriteRegister(NRF_REG_TX_ADDR, addr, 5);
   NRF_WriteRegister(NRF_REG_RX_ADDR_P0, addr, 5);
-  int retires = 3;
+  int retries = 3;
   NRF_Transmit(data, len);
-  while (retires > 0) {
+  while (retries > 0) {
     for (int i = 0; i < 100 && com_ack == TRANSMIT_ONGOING; ++i) {
       tx_thread_sleep(1);
     }
@@ -151,7 +155,7 @@ TransmitStatus COM_RF_Transmit(uint8_t robot, uint8_t* data, uint8_t len) {
     }
     com_ack = TRANSMIT_ONGOING;
     NRF_ReTransmit();
-    --retires;
+    --retries;
   }
 
   if (com_ack != TRANSMIT_OK) {
@@ -206,4 +210,102 @@ void COM_RF_Receive(uint8_t pipe) {
   }
 
   NRF_SetRegisterBit(NRF_REG_STATUS, 6);
+}
+
+uint8_t* COM_CreateDummyPacket(uint8_t robot_id, uint8_t* len) {
+  Command *cmd = malloc(sizeof(Command));
+  command__init(cmd);
+
+  cmd->command_id = ACTION_TYPE__MOVE_TO_ACTION;
+  cmd->robot_id = robot_id;
+
+  cmd->dest = malloc(sizeof(Vector3D));
+  if (!cmd->dest) {
+      return NULL;
+  }
+
+  vector3_d__init(cmd->dest);
+  cmd->dest->x = 1;
+  cmd->dest->y = 2;
+  cmd->dest->w = 3;
+
+  *len = command__get_packed_size(cmd);
+  uint8_t *buffer = malloc(*len);
+  if (!buffer) {
+      free(cmd->dest);
+      free(cmd);
+      return NULL;
+  }
+
+  command__pack(cmd, buffer);
+
+  return buffer;
+}
+
+UINT COM_ParsePacket(NX_PACKET *packet, PACKET_TYPE packet_type) {
+  UINT ret = NX_SUCCESS;
+
+  switch (packet_type) {
+  case SSL_WRAPPER: {
+    int length = packet->nx_packet_append_ptr - packet->nx_packet_prepend_ptr;
+    ParsedFrame *prased_frame = NULL;
+    prased_frame = parsed_frame__unpack(NULL, length, packet->nx_packet_prepend_ptr);
+    if (prased_frame == NULL) {
+      ret = NX_INVALID_PACKET;
+    } else {
+      LOG_INFO("Received msg\r\n");
+
+      free(prased_frame);
+    }
+    // TODO: we need to extract the interesting data that is supposed
+    // to be sent to each robot, then queue them up and send them
+  } break;
+  case ROBOT_COMMAND: {
+    int length = packet->nx_packet_append_ptr - packet->nx_packet_prepend_ptr;
+
+    if (length > 31) {
+      ret = NX_INVALID_PACKET;
+    } else {
+      Command *command = NULL;
+      command = command__unpack(NULL, length, packet->nx_packet_prepend_ptr);
+
+      if (command == NULL) {
+        ret = NX_INVALID_PACKET;
+        LOG_ERROR("Invalid packet!\r\n");
+      } else {
+        const ProtobufCEnumValue* enum_value = protobuf_c_enum_descriptor_get_value(&action_type__descriptor, command->command_id);
+
+        if (connected_robots[command->robot_id] == ROBOT_CONNECTED) {
+          uint8_t data[32];
+          data[0] = 1;
+          memcpy(data + 1, packet->nx_packet_prepend_ptr, length);
+          TransmitStatus status = COM_RF_Transmit(command->robot_id, data, length + 1);
+          if (status != TRANSMIT_OK) {
+            LOG_INFO("Failed sending robot #%d command %s\r\n", command->robot_id, enum_value->name);
+            no_robot_responses[command->robot_id]++;
+
+            if (no_robot_responses[command->robot_id] > MAX_NO_RESPONSES) {
+              connected_robots[command->robot_id] = ROBOT_DISCONNECTED;
+              no_robot_responses[command->robot_id] = 0;
+              LOG_INFO("Disconnected robot #%d after %d TX attempts\r\n", command->robot_id, MAX_NO_RESPONSES+1);
+            }
+          } else {
+            no_robot_responses[command->robot_id] = 0;
+            LOG_INFO("Successfully sent robot #%d command %s\r\n", command->robot_id, enum_value->name);
+          }
+        } else {
+          LOG_INFO("Robot #%d is disconnected, can't send %s\r\n", command->robot_id, enum_value->name);
+        }
+      }
+
+      protobuf_c_message_free_unpacked(&command->base, NULL);
+    }
+  } break;
+  }
+
+  if (ret != NX_SUCCESS) {
+    LOG_WARNING("Failed to parse UDP packet\r\n");
+  }
+
+  return ret;
 }

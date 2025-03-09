@@ -23,8 +23,10 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "main.h"
 #include "com.h"
 #include <stdio.h>
+#include "log.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -45,11 +47,13 @@
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN PV */
 TX_THREAD app_thread;
+TX_THREAD dummy_data_thread;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN PFP */
 static VOID tx_app_thread_entry (ULONG thread_input);
+static VOID dummy_data_thread_entry(ULONG thread_input);
 /* USER CODE END PFP */
 
 /**
@@ -64,16 +68,25 @@ UINT App_ThreadX_Init(VOID *memory_ptr)
   /* USER CODE BEGIN App_ThreadX_MEM_POOL */
 
   TX_BYTE_POOL *byte_pool = (TX_BYTE_POOL*)memory_ptr;
-  CHAR *pointer;
+  CHAR *pointer, *pointer2;
   if (tx_byte_allocate(byte_pool, (VOID **) &pointer, TX_APP_STACK_SIZE, TX_NO_WAIT) != TX_SUCCESS)
   {
     return TX_POOL_ERROR;
   }
+
+#if SEND_DUMMY_DATA==1
+  if (tx_byte_allocate(byte_pool, (VOID **) &pointer2, TX_APP_STACK_SIZE, TX_NO_WAIT) != TX_SUCCESS)
+  {
+    return TX_POOL_ERROR;
+  }
+#endif
   /* USER CODE END App_ThreadX_MEM_POOL */
 
   /* USER CODE BEGIN App_ThreadX_Init */
-  ret = tx_thread_create(&app_thread, "Tx App thread", tx_app_thread_entry , 0, pointer, TX_APP_STACK_SIZE,
-                         11, 11, TX_NO_TIME_SLICE, TX_AUTO_START);
+  ret = tx_thread_create(&app_thread, "Tx App thread", tx_app_thread_entry, 0, pointer, TX_APP_STACK_SIZE, 11, 11, TX_NO_TIME_SLICE, TX_AUTO_START);
+#if SEND_DUMMY_DATA==1
+  ret |= tx_thread_create(&dummy_data_thread, "Dummy Data Thread", dummy_data_thread_entry, 0, pointer2, TX_APP_STACK_SIZE, 11, 11, TX_NO_TIME_SLICE, TX_AUTO_START);
+#endif
   /* USER CODE END App_ThreadX_Init */
 
   return ret;
@@ -98,9 +111,23 @@ void MX_ThreadX_Init(void)
 }
 
 /* USER CODE BEGIN 1 */
-static VOID tx_app_thread_entry (ULONG thread_input) {
+static VOID tx_app_thread_entry(ULONG thread_input)
+{
   COM_RF_Init(&hspi1);
   COM_RF_PingRobots(true);
+}
 
+static VOID dummy_data_thread_entry(ULONG thread_input)
+{
+  for (;;) {
+    for (uint8_t i = 0; i < MAX_ROBOT_COUNT; ++i) {
+      uint8_t robot_id = i;
+      uint8_t len;
+      uint8_t* buffer = COM_CreateDummyPacket(robot_id, &len);
+      COM_RF_Transmit(robot_id, buffer, len);
+      free(buffer);
+    }
+    tx_thread_sleep(100);
+  }
 }
 /* USER CODE END 1 */
