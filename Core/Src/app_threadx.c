@@ -127,7 +127,7 @@ static VOID dummy_data_thread_entry(ULONG thread_input)
       COM_RF_Transmit(robot_id, buffer, len);
       free(buffer);
     }
-    tx_thread_sleep(100);
+    tx_thread_sleep(0);
   }
 }
 /* USER CODE END 1 */

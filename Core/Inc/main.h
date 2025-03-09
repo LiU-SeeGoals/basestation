@@ -81,7 +81,7 @@ extern SPI_HandleTypeDef hspi1;
 #define NRF_CSN_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
-#define SEND_DUMMY_DATA 1
+#define SEND_DUMMY_DATA 0
 #define MAX_ROBOT_COUNT 16
 /* USER CODE END Private defines */
 

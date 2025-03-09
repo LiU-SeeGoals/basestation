@@ -214,15 +214,13 @@ void COM_RF_Receive(uint8_t pipe) {
 
 uint8_t* COM_CreateDummyPacket(uint8_t robot_id, uint8_t* len) {
   Command *cmd = malloc(sizeof(Command));
+
   command__init(cmd);
 
   cmd->command_id = ACTION_TYPE__MOVE_TO_ACTION;
   cmd->robot_id = robot_id;
 
   cmd->dest = malloc(sizeof(Vector3D));
-  if (!cmd->dest) {
-      return NULL;
-  }
 
   vector3_d__init(cmd->dest);
   cmd->dest->x = 1;
@@ -231,13 +229,9 @@ uint8_t* COM_CreateDummyPacket(uint8_t robot_id, uint8_t* len) {
 
   *len = command__get_packed_size(cmd);
   uint8_t *buffer = malloc(*len);
-  if (!buffer) {
-      free(cmd->dest);
-      free(cmd);
-      return NULL;
-  }
 
   command__pack(cmd, buffer);
+  free(cmd->dest);
 
   return buffer;
 }
