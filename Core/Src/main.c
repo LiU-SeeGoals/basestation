@@ -134,7 +134,7 @@ int main(void)
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
   LOG_Init(&huart3);
-  LOG_InitModule(&internal_log_mod, "MAIN", LOG_LEVEL_INFO);
+  LOG_InitModule(&internal_log_mod, "MAIN", LOG_LEVEL_INFO, 0);
   LOG_INFO("Startup finished...\r\n");
 
   /* USER CODE END 2 */

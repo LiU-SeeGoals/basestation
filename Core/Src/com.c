@@ -24,7 +24,7 @@ uint8_t msg_order[MAX_ROBOT_COUNT];
  */
 
 void COM_RF_Init(SPI_HandleTypeDef* hspi) {
-  LOG_InitModule(&internal_log_mod, "RF", LOG_LEVEL_TRACE);
+  LOG_InitModule(&internal_log_mod, "RF", LOG_LEVEL_TRACE, 0);
   uint8_t address[5] = CONTROLLER_ADDR;
   com_ack = TRANSMIT_OK;
   if (tx_semaphore_create(&semaphore, "NRF-semaphore", 1) != TX_SUCCESS) {
@@ -44,8 +44,11 @@ void COM_RF_Init(SPI_HandleTypeDef* hspi) {
   // Resets all registers but keeps the device in standby-I mode
   NRF_Reset();
 
-  // Set the RF channel frequency, it's defined as: 2400 + NRF_REG_RF_CH [MHz]
-  NRF_WriteRegisterByte(NRF_REG_RF_CH, 0x0F);
+  // See nRF24L01+ chapter 6.3 for more...
+  // Set the RF channel frequency to 2500, i.e. outside of wifi range
+  // It's defined as: 2400 + NRF_REG_RF_CH [MHz]
+  // NRF_REG_RF_CH can 0-127, but not all values seem to work
+  NRF_WriteRegisterByte(NRF_REG_RF_CH, 0x64);
 
   // Setup the TX address.
   // We also have to set pipe 0 to receive on the same address.
