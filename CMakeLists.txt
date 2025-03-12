@@ -73,5 +73,5 @@ add_custom_command(TARGET ${PROJECT_NAME}.elf POST_BUILD
         COMMENT "Building ${HEX_FILE}
 Building ${BIN_FILE}")
 
-add_custom_target(flash DEPENDS ${BIN_FILE} ${PROJECT_NAME}.elf COMMAND STM32_Programmer_CLI -c port=SWD sn=004C00283232511639353236 ap=1 -w ${BIN_FILE} 0x08000000 -rst)
+add_custom_target(flash DEPENDS ${BIN_FILE} ${PROJECT_NAME}.elf COMMAND STM32_Programmer_CLI -c port=SWD sn=004900303433510F37363934 ap=1 -w ${BIN_FILE} 0x08000000 -rst)
 
