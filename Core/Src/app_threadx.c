@@ -114,7 +114,7 @@ void MX_ThreadX_Init(void)
 static VOID tx_app_thread_entry(ULONG thread_input)
 {
   COM_RF_Init(&hspi1);
-  COM_RF_PingRobots(true);
+  //COM_RF_PingRobots(true);
 }
 
 static VOID dummy_data_thread_entry(ULONG thread_input)

@@ -11,7 +11,7 @@
 #define PIPE_CONTROLLER 0
 #define PIPE_VISION     1
 #define CONNECT_MAGIC   0x4d, 0xf8, 0x42, 0x79
-#define MAX_NO_RESPONSES 20
+#define MAX_NO_RESPONSES 1000
 
 /* Private variables */
 uint8_t no_robot_responses[MAX_ROBOT_COUNT];
@@ -136,14 +136,14 @@ void COM_RF_HandleIRQ() {
 }
 
 TransmitStatus COM_RF_Transmit(uint8_t robot, uint8_t* data, uint8_t len) {
-  uint8_t addr[5] = ROBOT_ACTION_ADDR(robot);
   tx_semaphore_get(&semaphore, TX_WAIT_FOREVER);
+  uint8_t addr[5] = ROBOT_ACTION_ADDR(robot);
   com_ack = TRANSMIT_ONGOING;
   data[0] |= msg_order[robot];
   msg_order[robot] += 16;
   NRF_EnterMode(NRF_MODE_STANDBY1);
   NRF_WriteRegister(NRF_REG_TX_ADDR, addr, 5);
-  NRF_WriteRegister(NRF_REG_RX_ADDR_P0, addr, 5);
+  NRF_WriteRegister(NRF_REG_RX_ADDR_P0, addr, 5); // to receive auto-ACK
   int retries = 3;
   NRF_Transmit(data, len);
   while (retries > 0) {
@@ -159,7 +159,6 @@ TransmitStatus COM_RF_Transmit(uint8_t robot, uint8_t* data, uint8_t len) {
   }
 
   if (com_ack != TRANSMIT_OK) {
-    // Flush tx buffer
     NRF_SendCommand(NRF_CMD_FLUSH_TX);
   }
 
@@ -188,8 +187,6 @@ void COM_RF_Receive(uint8_t pipe) {
   uint8_t payload[len];
   NRF_ReadPayload(payload, len);
 
-  LOG_INFO("Payload of length %i on pipe %d\r\n", len, pipe);
-
   if (len > 2 && payload[0] == 0x57 && payload[1] == 0x75) {
     // We received a LOG_BASESTATION(...)
     LOG_INFO("ROBOT %d: %s\r\n", payload[2], payload + 3);
@@ -200,6 +197,7 @@ void COM_RF_Receive(uint8_t pipe) {
     uint8_t id = payload[4];
 
     if (magic == 0x4df84279 && id < MAX_ROBOT_COUNT) {
+      // We received a ping
       if (connected_robots[id] != ROBOT_PENDING) {
         LOG_INFO("Robot %d connected\r\n", id);
       }
@@ -242,22 +240,21 @@ UINT COM_ParsePacket(NX_PACKET *packet, PACKET_TYPE packet_type) {
   switch (packet_type) {
   case SSL_WRAPPER: {
     int length = packet->nx_packet_append_ptr - packet->nx_packet_prepend_ptr;
-    ParsedFrame *prased_frame = NULL;
-    prased_frame = parsed_frame__unpack(NULL, length, packet->nx_packet_prepend_ptr);
-    if (prased_frame == NULL) {
+    ParsedFrame *parsed_frame = NULL;
+    parsed_frame = parsed_frame__unpack(NULL, length, packet->nx_packet_prepend_ptr);
+    if (parsed_frame == NULL) {
       ret = NX_INVALID_PACKET;
     } else {
       LOG_INFO("Received msg\r\n");
 
-      free(prased_frame);
+      free(parsed_frame);
     }
-    // TODO: we need to extract the interesting data that is supposed
-    // to be sent to each robot, then queue them up and send them
   } break;
   case ROBOT_COMMAND: {
     int length = packet->nx_packet_append_ptr - packet->nx_packet_prepend_ptr;
 
     if (length > 31) {
+      LOG_ERROR("Robot command packet over 31 bytes (%d bytes)\r\n", length);
       ret = NX_INVALID_PACKET;
     } else {
       Command *command = NULL;
@@ -276,15 +273,14 @@ UINT COM_ParsePacket(NX_PACKET *packet, PACKET_TYPE packet_type) {
           TransmitStatus status = COM_RF_Transmit(command->robot_id, data, length + 1);
           if (status != TRANSMIT_OK) {
             LOG_INFO("Failed sending robot #%d command %s\r\n", command->robot_id, enum_value->name);
-            no_robot_responses[command->robot_id]++;
-
-            if (no_robot_responses[command->robot_id] > MAX_NO_RESPONSES) {
-              connected_robots[command->robot_id] = ROBOT_DISCONNECTED;
-              no_robot_responses[command->robot_id] = 0;
-              LOG_INFO("Disconnected robot #%d after %d TX attempts\r\n", command->robot_id, MAX_NO_RESPONSES+1);
-            }
+            //no_robot_responses[command->robot_id]++;
+            //if (no_robot_responses[command->robot_id] > MAX_NO_RESPONSES) {
+            //  connected_robots[command->robot_id] = ROBOT_DISCONNECTED;
+            //  no_robot_responses[command->robot_id] = 0;
+            //  LOG_INFO("Disconnected robot #%d after %d TX attempts\r\n", command->robot_id, MAX_NO_RESPONSES+1);
+            //}
           } else {
-            no_robot_responses[command->robot_id] = 0;
+            //no_robot_responses[command->robot_id] = 0;
             LOG_INFO("Successfully sent robot #%d command %s\r\n", command->robot_id, enum_value->name);
           }
         } else {
