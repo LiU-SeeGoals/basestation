@@ -11,7 +11,7 @@
 #define PIPE_CONTROLLER 0
 #define PIPE_VISION     1
 #define CONNECT_MAGIC   0x4d, 0xf8, 0x42, 0x79
-#define MAX_NO_RESPONSES 1000
+#define MAX_NO_RESPONSES 30
 
 /* Private variables */
 uint8_t no_robot_responses[MAX_ROBOT_COUNT];
@@ -20,7 +20,7 @@ TX_SEMAPHORE semaphore;
 volatile TransmitStatus com_ack; // Status of acknowledgement of a transmission
 static LOG_Module internal_log_mod;
 uint8_t msg_order[MAX_ROBOT_COUNT];
-uint8_t last_com_status = 4; // 0 = succeed, 1 = fail, 3 = disconnected, 4 = error
+uint8_t last_com_status = -1; // -1 = disconnected, 0 = succeed, 1 = fail, 3 = disconnected, 4 = received invalid packet
 
 
 /*
@@ -209,7 +209,10 @@ void COM_RF_Receive(uint8_t pipe) {
       }
       connected_robots[id] = ROBOT_CONNECTED;
     } else {
-      LOG_INFO("Received invalid packet: 0x%#08x\r\n", magic);
+      if (last_com_status != 4) {
+        LOG_INFO("Received invalid packet: 0x%#08x\r\n", magic);
+        last_com_status = 4;
+      }
     }
   }
 
@@ -282,12 +285,13 @@ UINT COM_ParsePacket(NX_PACKET *packet, PACKET_TYPE packet_type) {
               LOG_INFO("Failed sending robot #%d command %s\r\n", command->robot_id, enum_value->name);
               last_com_status = 1;
             }
-            //no_robot_responses[command->robot_id]++;
-            //if (no_robot_responses[command->robot_id] > MAX_NO_RESPONSES) {
-            //  connected_robots[command->robot_id] = ROBOT_DISCONNECTED;
-            //  no_robot_responses[command->robot_id] = 0;
-            //  LOG_INFO("Disconnected robot #%d after %d TX attempts\r\n", command->robot_id, MAX_NO_RESPONSES+1);
-            //}
+            no_robot_responses[command->robot_id]++;
+            if (no_robot_responses[command->robot_id] > MAX_NO_RESPONSES) {
+              connected_robots[command->robot_id] = ROBOT_DISCONNECTED;
+              no_robot_responses[command->robot_id] = 0;
+              LOG_INFO("Disconnected robot #%d after %d TX attempts\r\n", command->robot_id, MAX_NO_RESPONSES+1);
+              last_com_status = -1;
+            }
           } else {
             //no_robot_responses[command->robot_id] = 0;
             if (last_com_status != 0) {

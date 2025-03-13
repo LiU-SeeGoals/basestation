@@ -132,7 +132,11 @@ static VOID dummy_data_thread_entry(ULONG thread_input)
 
 static VOID status_thread_entry(ULONG thread_input)
 {
-  LOG_INFO("Still alive...\r\n");
-  tx_thread_sleep(5);
+  uint8_t count = 0;
+  for(;;) {
+    LOG_INFO("Still alive %d...\r\n", count);
+    tx_thread_sleep(500);
+    count++;
+  }
 }
 /* USER CODE END 1 */
