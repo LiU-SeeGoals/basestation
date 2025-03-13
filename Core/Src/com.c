@@ -43,6 +43,7 @@ void COM_RF_Init(SPI_HandleTypeDef* hspi) {
   NRF_Init(hspi, NRF_CSN_GPIO_Port, NRF_CSN_Pin, NRF_CE_GPIO_Port, NRF_CE_Pin);
   if(NRF_VerifySPI() != NRF_OK) {
     LOG_WARNING("Couldn't verify nRF24 SPI...\r\n");
+    Error_Handler();
   }
 
   // Resets all registers but keeps the device in standby-I mode
