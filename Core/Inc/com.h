@@ -60,12 +60,6 @@ void COM_RF_HandleIRQ(void);
  */
 void COM_RF_PrintInfo(void);
 
-/**
- * Send a ping message to robots. If ping_all is false,
- * only connected robots will be pinged.
- */
-void COM_RF_PingRobots(bool ping_all);
-
 uint8_t* COM_CreateDummyPacket(uint8_t robot_id, uint8_t* len);
 
 UINT COM_ParsePacket(NX_PACKET *packet, PACKET_TYPE packet_type);

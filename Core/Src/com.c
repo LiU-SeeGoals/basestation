@@ -21,6 +21,7 @@ volatile TransmitStatus com_ack; // Status of acknowledgement of a transmission
 static LOG_Module internal_log_mod;
 uint8_t msg_order[MAX_ROBOT_COUNT];
 uint8_t last_com_status = -1; // -1 = disconnected, 0 = succeed, 1 = fail, 3 = disconnected, 4 = received invalid packet
+uint8_t last_com_status_robot[MAX_ROBOT_COUNT]; // -1 = disconnected, 0 = succeed, 1 = fail, 3 = disconnected, 4 = received invalid packet
 
 
 /*
@@ -39,6 +40,7 @@ void COM_RF_Init(SPI_HandleTypeDef* hspi) {
   // Mark all robots as disconnected
   for (int i = 0; i < MAX_ROBOT_COUNT; ++i) {
     connected_robots[i] = ROBOT_DISCONNECTED;
+    last_com_status_robot[i] = -1;
     msg_order[i] = 0;
   }
 
@@ -80,42 +82,6 @@ void COM_RF_Init(SPI_HandleTypeDef* hspi) {
   // Enter receive mode
   NRF_EnterMode(NRF_MODE_RX);
   LOG_INFO("Initialized...\r\n");
-}
-
-static uint8_t msg[] = {0, 'P', 'i', 'n', 'g'};
-
-void COM_RF_PingRobots(bool ping_all) {
-  LOG_INFO("Requesting ping...\r\n");
-  for (int i = 0; i < MAX_ROBOT_COUNT; ++i) {
-    if (!ping_all && connected_robots[i] != ROBOT_CONNECTED) {
-      continue;
-    }
-
-    // Request a ping message up to 2 times.
-    // This is because the robot might ignore the first one if the message id
-    // happens to match the last value the robot knows.
-    for (int k = 0; k < 2 ; ++k) {
-      connected_robots[i] = ROBOT_PENDING;
-      if (COM_RF_Transmit(i, msg, 5) != TRANSMIT_OK) {
-        LOG_INFO("Robot %d did not respond\r\n", i);
-        connected_robots[i] = ROBOT_DISCONNECTED;
-        goto next;
-      }
-      for (int j = 0; j < 50; ++j) {
-        tx_thread_sleep(1);
-        if (connected_robots[i] == ROBOT_CONNECTED) {
-          LOG_INFO("Robot %d responded\r\n", i);
-          goto next;
-        }
-      }
-    }
-
-    // Coming here means both ack:s were received, but the robot still did not respond.
-    LOG_WARNING("Robot %d receives messages, but is not responding to pings.\r\n", i);
-
-    connected_robots[i] = ROBOT_DISCONNECTED;
-    next:;
-  }
 }
 
 void COM_RF_HandleIRQ() {
@@ -175,10 +141,10 @@ TransmitStatus COM_RF_Transmit(uint8_t robot, uint8_t* data, uint8_t len) {
 
 void COM_RF_PrintInfo() {
   for (int i = 0; i < MAX_ROBOT_COUNT; ++i) {
-    if (connected_robots[i] != ROBOT_DISCONNECTED) {
-      LOG_INFO("Robot %d connected\r\n", i);
-    } else {
+    if (connected_robots[i] == ROBOT_DISCONNECTED) {
       LOG_INFO("Robot %d not connected\r\n", i);
+    } else {
+      LOG_INFO("Robot %d connected\r\n", i);
     }
   }
   NRF_PrintFIFOStatus();
@@ -204,7 +170,7 @@ void COM_RF_Receive(uint8_t pipe) {
 
     if (magic == 0x4df84279 && id < MAX_ROBOT_COUNT) {
       // We received a ping
-      if (connected_robots[id] != ROBOT_PENDING) {
+      if (connected_robots[id] != ROBOT_DISCONNECTED) {
         LOG_INFO("Robot %d connected\r\n", id);
       }
       connected_robots[id] = ROBOT_CONNECTED;
@@ -281,28 +247,28 @@ UINT COM_ParsePacket(NX_PACKET *packet, PACKET_TYPE packet_type) {
           memcpy(data + 1, packet->nx_packet_prepend_ptr, length);
           TransmitStatus status = COM_RF_Transmit(command->robot_id, data, length + 1);
           if (status != TRANSMIT_OK) {
-            if (last_com_status != 1) {
+            if (last_com_status_robot[command->robot_id] != 1) {
               LOG_INFO("Failed sending robot #%d command %s\r\n", command->robot_id, enum_value->name);
-              last_com_status = 1;
+              last_com_status_robot[command->robot_id] = 1;
             }
             no_robot_responses[command->robot_id]++;
             if (no_robot_responses[command->robot_id] > MAX_NO_RESPONSES) {
               connected_robots[command->robot_id] = ROBOT_DISCONNECTED;
               no_robot_responses[command->robot_id] = 0;
               LOG_INFO("Disconnected robot #%d after %d TX attempts\r\n", command->robot_id, MAX_NO_RESPONSES+1);
-              last_com_status = -1;
+              last_com_status_robot[command->robot_id] = -1;
             }
           } else {
             //no_robot_responses[command->robot_id] = 0;
-            if (last_com_status != 0) {
+            if (last_com_status_robot[command->robot_id] != 0) {
               LOG_INFO("Successfully sent robot #%d command %s\r\n", command->robot_id, enum_value->name);
-              last_com_status = 0;
+              last_com_status_robot[command->robot_id] = 0;
             }
           }
         } else {
-          if (last_com_status != 3) {
+          if (last_com_status_robot[command->robot_id] != 3) {
             LOG_INFO("Robot #%d is disconnected, can't send %s\r\n", command->robot_id, enum_value->name);
-            last_com_status = 3;
+            last_com_status_robot[command->robot_id] = 3;
           }
         }
       }
