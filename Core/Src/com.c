@@ -52,7 +52,10 @@ void COM_RF_Init(SPI_HandleTypeDef* hspi) {
   // Set the RF channel frequency to 2500, i.e. outside of wifi range
   // It's defined as: 2400 + NRF_REG_RF_CH [MHz]
   // NRF_REG_RF_CH can 0-127, but not all values seem to work
-  NRF_WriteRegisterByte(NRF_REG_RF_CH, 0x64);
+  //NRF_WriteRegisterByte(NRF_REG_RF_CH, 0x64); // 2500 works
+  //NRF_WriteRegisterByte(NRF_REG_RF_CH, 0x70); // 2512 works
+  NRF_WriteRegisterByte(NRF_REG_RF_CH, 0x7d); // 2525
+  //NRF_WriteRegisterByte(NRF_REG_RF_CH, 0x7f); // 2527 works
 
   // Setup the TX address.
   // We also have to set pipe 0 to receive on the same address.
