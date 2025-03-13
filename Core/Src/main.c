@@ -135,6 +135,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
   LOG_Init(&huart3);
   LOG_InitModule(&internal_log_mod, "MAIN", LOG_LEVEL_INFO, 0);
+  COM_RF_Init(&hspi1);
   LOG_INFO("Startup finished...\r\n");
 
   /* USER CODE END 2 */

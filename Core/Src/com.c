@@ -20,12 +20,14 @@ TX_SEMAPHORE semaphore;
 volatile TransmitStatus com_ack; // Status of acknowledgement of a transmission
 static LOG_Module internal_log_mod;
 uint8_t msg_order[MAX_ROBOT_COUNT];
+uint8_t last_com_status = 4; // 0 = succeed, 1 = fail, 3 = disconnected, 4 = error
 
 
 /*
  * Public functions implementations
  */
 
+//uint8_t status = 0; // 0 = succeed, 1 = error, 2 = fail
 void COM_RF_Init(SPI_HandleTypeDef* hspi) {
   LOG_InitModule(&internal_log_mod, "RF", LOG_LEVEL_TRACE, 0);
   uint8_t address[5] = CONTROLLER_ADDR;
@@ -276,7 +278,10 @@ UINT COM_ParsePacket(NX_PACKET *packet, PACKET_TYPE packet_type) {
           memcpy(data + 1, packet->nx_packet_prepend_ptr, length);
           TransmitStatus status = COM_RF_Transmit(command->robot_id, data, length + 1);
           if (status != TRANSMIT_OK) {
-            LOG_INFO("Failed sending robot #%d command %s\r\n", command->robot_id, enum_value->name);
+            if (last_com_status != 1) {
+              LOG_INFO("Failed sending robot #%d command %s\r\n", command->robot_id, enum_value->name);
+              last_com_status = 1;
+            }
             //no_robot_responses[command->robot_id]++;
             //if (no_robot_responses[command->robot_id] > MAX_NO_RESPONSES) {
             //  connected_robots[command->robot_id] = ROBOT_DISCONNECTED;
@@ -285,10 +290,16 @@ UINT COM_ParsePacket(NX_PACKET *packet, PACKET_TYPE packet_type) {
             //}
           } else {
             //no_robot_responses[command->robot_id] = 0;
-            LOG_INFO("Successfully sent robot #%d command %s\r\n", command->robot_id, enum_value->name);
+            if (last_com_status != 0) {
+              LOG_INFO("Successfully sent robot #%d command %s\r\n", command->robot_id, enum_value->name);
+              last_com_status = 0;
+            }
           }
         } else {
-          LOG_INFO("Robot #%d is disconnected, can't send %s\r\n", command->robot_id, enum_value->name);
+          if (last_com_status != 3) {
+            LOG_INFO("Robot #%d is disconnected, can't send %s\r\n", command->robot_id, enum_value->name);
+            last_com_status = 3;
+          }
         }
       }
 
