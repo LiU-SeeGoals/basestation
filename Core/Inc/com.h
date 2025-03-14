@@ -45,7 +45,7 @@ void COM_RF_Init(SPI_HandleTypeDef* hspi);
  * @param len length of data, <= 32
  * @return
  */
-TransmitStatus COM_RF_Transmit(uint8_t robot, uint8_t* data, uint8_t len);
+void COM_RF_Transmit(uint8_t robot, uint8_t* data, uint8_t len);
 
 /**
  * Parse the received message and handle it correctly.
@@ -63,8 +63,6 @@ void COM_RF_HandleIRQ(void);
  * Printf:s status and FIFO status registers from the NRF.
  */
 void COM_RF_PrintInfo(void);
-
-uint8_t* COM_CreateDummyPacket(uint8_t robot_id, uint8_t* len);
 
 UINT COM_ParsePacket(NX_PACKET *packet, PACKET_TYPE packet_type);
 
