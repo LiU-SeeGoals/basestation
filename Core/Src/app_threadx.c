@@ -81,14 +81,14 @@ UINT App_ThreadX_Init(VOID *memory_ptr)
   }
 #endif
 
-  if (tx_byte_allocate(byte_pool, (VOID **) &pointer3, TX_APP_STACK_SIZE, TX_NO_WAIT) != TX_SUCCESS)
-  {
-    return TX_POOL_ERROR;
-  }
+  //if (tx_byte_allocate(byte_pool, (VOID **) &pointer3, TX_APP_STACK_SIZE, TX_NO_WAIT) != TX_SUCCESS)
+  //{
+  //  return TX_POOL_ERROR;
+  //}
   /* USER CODE END App_ThreadX_MEM_POOL */
 
   /* USER CODE BEGIN App_ThreadX_Init */
-  ret = tx_thread_create(&status_thread, "Tx App thread", status_thread_entry, 0, pointer3, TX_APP_STACK_SIZE, 11, 11, TX_NO_TIME_SLICE, TX_AUTO_START);
+  //ret = tx_thread_create(&status_thread, "Tx App thread", status_thread_entry, 0, pointer3, TX_APP_STACK_SIZE, 11, 11, TX_NO_TIME_SLICE, TX_AUTO_START);
 #if SEND_DUMMY_DATA==1
   ret |= tx_thread_create(&dummy_data_thread, "Dummy Data Thread", dummy_data_thread_entry, 0, pointer2, TX_APP_STACK_SIZE, 11, 11, TX_NO_TIME_SLICE, TX_AUTO_START);
 #endif
@@ -135,7 +135,7 @@ static VOID status_thread_entry(ULONG thread_input)
   uint8_t count = 0;
   for(;;) {
     LOG_INFO("Still alive %d...\r\n", count);
-    tx_thread_sleep(500);
+    tx_thread_sleep(1000);
     count++;
   }
 }

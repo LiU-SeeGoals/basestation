@@ -87,6 +87,7 @@ void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin) {
 }
 
 void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin) {
+  __disable_interrupts();
   switch (GPIO_Pin) {
     case NRF_IRQ_Pin:
       COM_RF_HandleIRQ();
@@ -95,6 +96,7 @@ void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin) {
       LOG_WARNING("Unhandled falling interrupt...\r\n");
       break;
   }
+  __enable_interrupts();
 }
 
 /* USER CODE END 0 */

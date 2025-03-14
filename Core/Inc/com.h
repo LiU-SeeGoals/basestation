@@ -13,11 +13,15 @@
 #define ROBOT_PING_ADDR(id)   {1, 255, 255, id, 0}
 
 typedef enum TransmitStatus {
-    TRANSMIT_OK, TRANSMIT_ONGOING, TRANSMIT_FAILED
+    TRANSMIT_INIT,
+    TRANSMIT_OK,
+    TRANSMIT_ONGOING,
+    TRANSMIT_FAILED,
 } TransmitStatus;
 
 typedef enum RobotConnection {
-    ROBOT_CONNECTED, ROBOT_DISCONNECTED, ROBOT_PENDING
+    ROBOT_CONNECTED,
+    ROBOT_DISCONNECTED
 } RobotConnection;
 
 enum _PACKET_TYPE {SSL_WRAPPER, ROBOT_COMMAND};
@@ -59,12 +63,6 @@ void COM_RF_HandleIRQ(void);
  * Printf:s status and FIFO status registers from the NRF.
  */
 void COM_RF_PrintInfo(void);
-
-/**
- * Send a ping message to robots. If ping_all is false,
- * only connected robots will be pinged.
- */
-void COM_RF_PingRobots(bool ping_all);
 
 uint8_t* COM_CreateDummyPacket(uint8_t robot_id, uint8_t* len);
 
