@@ -7,3 +7,6 @@
 [submodule "Libraries/fw-shared-modules"]
 	path = Libraries/fw-shared-modules
 	url = git@github.com:LiU-SeeGoals/fw-shared-modules.git
+[submodule "Libraries/nRF24L01P-lib"]
+	path = Libraries/nRF24L01P-lib
+	url = git@github.com:LiU-SeeGoals/nRF24L01P-lib.git
