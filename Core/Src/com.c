@@ -25,9 +25,7 @@ typedef enum RobotComStatus {
 
 /* Private variables */
 TX_SEMAPHORE semaphore;
-volatile TransmitStatus com_ack; // Status of acknowledgement of a transmission
 static LOG_Module internal_log_mod;
-uint8_t msg_order[MAX_ROBOT_COUNT];
 
 /*
  * Public functions implementations
@@ -46,39 +44,60 @@ void COM_RF_Init(SPI_HandleTypeDef* hspi) {
     LOG_ERROR("Failed creating NRF-semaphore\r\n");
   }
 
-  for (int i = 0; i < MAX_ROBOT_COUNT; ++i) {
-    last_robot_com_status[i] = COMSTAT_INIT;
-    msg_order[i] = 0;
-  }
-
-  com_ack = TRANSMIT_INIT;
-
-  // Resets all registers but keeps the device in standby-I mode
   NRF_Reset();
 
-  // See nRF24L01+ chapter 6.3 for more...
-  // Set the RF channel frequency to 2500, i.e. outside of wifi range
-  // It's defined as: 2400 + NRF_REG_RF_CH [MHz]
-  // NRF_REG_RF_CH can 0-127, but not all values seem to work.
-  // 2525 and below works, 2527 had issues...
-  NRF_WriteRegisterByte(NRF_REG_RF_CH, 0x7d); // 2525
-  //NRF_WriteRegisterByte(NRF_REG_RF_CH, 0x64); // 2500
+  uint8_t address[5] = {1, 255, 255, 1, 255};
+  NRF_WriteRegister(NRF_REG_TX_ADDR, address, 5);
+  NRF_WriteRegister(NRF_REG_RX_ADDR_P0, address, 5);
 
-  // Setup the TX address.
-  // We also have to set pipe 0 to receive on the same address.
-  uint8_t tx_addr[5] = ROBOT_ACTION_ADDR(0);
-  NRF_WriteRegister(NRF_REG_TX_ADDR, tx_addr, 5);
-  NRF_WriteRegister(NRF_REG_RX_ADDR_P0, tx_addr, 5);
+  // Channel 2.525 GHz
+  NRF_WriteRegisterByte(NRF_REG_RF_CH, 0x7d);
 
-  uint8_t rx_addr[5] = CONTROLLER_ADDR;
-  NRF_WriteRegister(NRF_REG_RX_ADDR_P1, rx_addr, 5);
-
-  // Disable retry transmissions
+  // No retransmissions
   NRF_WriteRegisterByte(NRF_REG_SETUP_RETR, 0x00);
 
-  // Enter receive mode
-  NRF_EnterMode(NRF_MODE_RX);
+  // No auto-acknowledgement
+  NRF_WriteRegisterByte(NRF_REG_EN_AA, 0x00);
+
+  // Dynamic data length
+  NRF_WriteRegisterByte(NRF_REG_DYNPD, 0x01);
+  NRF_WriteRegisterByte(NRF_REG_FEATURE, 0x04);
+
+  // 
+  //NRF_WriteRegisterByte(NRF_REG_RF_SETUP, 0x00);
+
+
   LOG_INFO("Initialized...\r\n");
+}
+
+void COM_Test() {
+    LOG_INFO("Sending data...\r\n");
+
+    uint8_t msg[10] = "HelloWorld";
+    uint8_t addr[5] = ROBOT_ACTION_ADDR(1);
+    NRF_WriteRegister(NRF_REG_TX_ADDR, addr, 5);
+    NRF_EnterMode(NRF_MODE_STANDBY1);
+    NRF_Status ret = NRF_Transmit(msg, 10);
+    NRF_SendCommand(NRF_CMD_FLUSH_TX);
+    switch (ret) {
+      case NRF_MAX_RT:
+        LOG_INFO("Max retransmissions reached, RX device not responding?\r\n");
+        break;
+      case NRF_SPI_BUSY:
+      case NRF_SPI_TIMEOUT:
+      case NRF_SPI_ERROR:
+        LOG_INFO("SPI error, pins correctly connected?\r\n");
+        break;
+      case NRF_OK:
+        LOG_INFO("Data sent...\r\n");
+        break;
+      case NRF_ERROR:
+        LOG_INFO("Error when sending.\r\n");
+        break;
+      case NRF_BAD_TRANSITION:
+        LOG_INFO("Bad transition.\r\n");
+        break;
+    }
 }
 
 void COM_RF_HandleIRQ() {
@@ -87,13 +106,11 @@ void COM_RF_HandleIRQ() {
   if (status & STATUS_MASK_MAX_RT) {
     // Max retries while sending.
     NRF_SetRegisterBit(NRF_REG_STATUS, STATUS_MAX_RT);
-    com_ack = TRANSMIT_FAILED;
   }
 
   if (status & STATUS_MASK_TX_DS) {
     // ACK received
     NRF_SetRegisterBit(NRF_REG_STATUS, STATUS_TX_DS);
-    com_ack = TRANSMIT_OK;
   }
 
   if (status & STATUS_MASK_RX_DR) {
@@ -108,7 +125,6 @@ void COM_RF_Transmit(uint8_t robot, uint8_t* data, uint8_t len) {
 
   uint8_t addr[5] = ROBOT_ACTION_ADDR(robot);
   NRF_WriteRegister(NRF_REG_TX_ADDR, addr, 5);
-  NRF_WriteRegister(NRF_REG_RX_ADDR_P0, addr, 5); // to receive auto-ACK
   NRF_EnterMode(NRF_MODE_STANDBY1);
   NRF_Transmit(data, len);
   NRF_SendCommand(NRF_CMD_FLUSH_TX);
@@ -152,12 +168,6 @@ void COM_RF_PrintInfo() {
   LOG_INFO("MASK_RX_DR:   %1X\r\n", ret & (1<<6));
   LOG_INFO("\r\n");
 
-  for (int i = 0; i < MAX_ROBOT_COUNT; ++i) {
-    if (last_robot_com_status[i] == COMSTAT_OK) {
-      LOG_INFO("Robot %d connected\r\n", i);
-    }
-  }
-
   LOG_INFO("\r\n");
 }
 
@@ -198,43 +208,13 @@ UINT COM_ParsePacket(NX_PACKET *packet, PACKET_TYPE packet_type) {
       return NX_INVALID_PACKET;
     }
 
-    if (last_robot_com_status[command->robot_id] == COMSTAT_DISCONNECTED) {
-      no_robot_responses[command->robot_id]++;
-      if (no_robot_responses[command->robot_id] == MAX_NO_RESPONSES) {
-        LOG_INFO("Robot %d still disconnected\r\n");
-        no_robot_responses[command->robot_id] = 0;
-      }
-      return ret;
-    }
-
     const ProtobufCEnumValue* enum_value = protobuf_c_enum_descriptor_get_value(&action_type__descriptor, command->command_id);
 
     uint8_t data[32];
     data[0] = 1;
     memcpy(data + 1, packet->nx_packet_prepend_ptr, length);
 
-    TransmitStatus status = COM_RF_Transmit(command->robot_id, data, length + 1);
-    if (status != TRANSMIT_OK) {
-      if (last_robot_com_status[command->robot_id] != COMSTAT_FAIL) {
-        LOG_INFO("Fail send robot #%d command %s\r\n", command->robot_id, enum_value->name);
-        last_robot_com_status[command->robot_id] = COMSTAT_FAIL;
-      }
-
-      no_robot_responses[command->robot_id]++;
-
-      if (no_robot_responses[command->robot_id] > MAX_NO_RESPONSES) {
-        last_robot_com_status[command->robot_id] = COMSTAT_DISCONNECTED;
-        no_robot_responses[command->robot_id] = 0;
-        LOG_INFO("Disconnected robot #%d after %d TX attempts\r\n", command->robot_id, MAX_NO_RESPONSES+1);
-      }
-    } else {
-      no_robot_responses[command->robot_id] = 0;
-
-      if (last_robot_com_status[command->robot_id] != COMSTAT_OK) {
-        LOG_INFO("Sent robot #%d command %s\r\n", command->robot_id, enum_value->name);
-        last_robot_com_status[command->robot_id] = COMSTAT_OK;
-      }
-    }
+    COM_RF_Transmit(command->robot_id, data, length + 1);
 
     protobuf_c_message_free_unpacked(&command->base, NULL);
   } break;

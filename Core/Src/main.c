@@ -79,6 +79,7 @@ void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin) {
   switch (GPIO_Pin) {
     case BTN_USER_Pin:
       COM_RF_PrintInfo();
+      COM_Test();
       break;
     default:
       LOG_ERROR("Unhandled rising interrupt...\r\n");

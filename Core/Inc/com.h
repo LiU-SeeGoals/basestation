@@ -64,6 +64,8 @@ void COM_RF_HandleIRQ(void);
  */
 void COM_RF_PrintInfo(void);
 
+void COM_Test();
+
 UINT COM_ParsePacket(NX_PACKET *packet, PACKET_TYPE packet_type);
 
 #endif /* COM_H */
