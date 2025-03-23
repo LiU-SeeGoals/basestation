@@ -79,6 +79,7 @@ void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin) {
   switch (GPIO_Pin) {
     case BTN_USER_Pin:
       COM_RF_PrintInfo();
+      COM_Test();
       break;
     default:
       LOG_ERROR("Unhandled rising interrupt...\r\n");
@@ -87,6 +88,7 @@ void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin) {
 }
 
 void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin) {
+  __disable_interrupts();
   switch (GPIO_Pin) {
     case NRF_IRQ_Pin:
       COM_RF_HandleIRQ();
@@ -95,6 +97,7 @@ void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin) {
       LOG_WARNING("Unhandled falling interrupt...\r\n");
       break;
   }
+  __enable_interrupts();
 }
 
 /* USER CODE END 0 */
@@ -135,6 +138,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
   LOG_Init(&huart3);
   LOG_InitModule(&internal_log_mod, "MAIN", LOG_LEVEL_INFO, 0);
+  COM_RF_Init(&hspi1);
   LOG_INFO("Startup finished...\r\n");
 
   /* USER CODE END 2 */

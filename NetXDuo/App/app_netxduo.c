@@ -58,7 +58,7 @@ TX_THREAD           NxUDPThread;
 TX_THREAD           NxLinkThread;
 NX_UDP_SOCKET       visionSocket;
 NX_UDP_SOCKET       controllerSocket;
-ULONG               VISION_PORT = 10020;
+ULONG               VISION_PORT = 10006;
 ULONG               CONTROLLER_PORT = 6001;
 ULONG               QUEUE_MAX_SIZE = 512;
 /* USER CODE END PV */
