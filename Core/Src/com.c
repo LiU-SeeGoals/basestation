@@ -26,6 +26,7 @@ typedef enum RobotComStatus {
 /* Private variables */
 TX_SEMAPHORE semaphore;
 static LOG_Module internal_log_mod;
+uint32_t last_received_packet;
 
 /*
  * Public functions implementations
@@ -37,7 +38,7 @@ void COM_RF_Init(SPI_HandleTypeDef* hspi) {
   NRF_Init(hspi, NRF_CSN_GPIO_Port, NRF_CSN_Pin, NRF_CE_GPIO_Port, NRF_CE_Pin);
   if(NRF_VerifySPI() != NRF_OK) {
     LOG_WARNING("Couldn't verify nRF24 SPI...\r\n");
-    Error_Handler();
+    //Error_Handler();
   }
 
   if (tx_semaphore_create(&semaphore, "NRF-semaphore", 1) != TX_SUCCESS) {
@@ -167,7 +168,9 @@ void COM_RF_PrintInfo() {
   LOG_INFO("MASK_TX_DS:   %1X\r\n", ret & (1<<5));
   LOG_INFO("MASK_RX_DR:   %1X\r\n", ret & (1<<6));
   LOG_INFO("\r\n");
-
+  LOG_INFO("Current tick: %d\r\n", HAL_GetTick());
+  LOG_INFO("Last received packet: %d\r\n", last_received_packet);
+  LOG_INFO("\r\n");
   LOG_INFO("\r\n");
 }
 
@@ -208,6 +211,7 @@ UINT COM_ParsePacket(NX_PACKET *packet, PACKET_TYPE packet_type) {
       return NX_INVALID_PACKET;
     }
 
+    last_received_packet = HAL_GetTick();
     const ProtobufCEnumValue* enum_value = protobuf_c_enum_descriptor_get_value(&action_type__descriptor, command->command_id);
 
     uint8_t data[32];
