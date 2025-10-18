@@ -254,6 +254,8 @@ UINT COM_ParsePacket(NX_PACKET *packet, PACKET_TYPE packet_type) {
     // TODO: we need to extract the interesting data that is supposed
     // to be sent to each robot, then queue them up and send them
   } break;
+  case MANUAL_PACKETS:{
+                      }
   case ROBOT_COMMAND: {
     int length = packet->nx_packet_append_ptr - packet->nx_packet_prepend_ptr;
 
@@ -291,7 +293,6 @@ UINT COM_ParsePacket(NX_PACKET *packet, PACKET_TYPE packet_type) {
           LOG_INFO("Robot #%d is disconnected, can't send %s\r\n", command->robot_id, enum_value->name);
         }
       }
-
       protobuf_c_message_free_unpacked(&command->base, NULL);
     }
   } break;
